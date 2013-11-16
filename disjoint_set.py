@@ -1,8 +1,3 @@
-# An implementation of Hindley-Milner type inference in Python, as an
-# exercise to improve my understanding of type inference algorithms.
-#
-# Tested with Python 2.7.
-
 import collections
 import unittest
 
