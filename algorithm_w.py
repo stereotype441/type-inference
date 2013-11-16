@@ -174,14 +174,23 @@ class TypeInferrer(object):
         # TODO: refactor the call to Monotype() into this function.
         return self.__type_sets.add_elem()
 
+    def new_type_application(self, type_constructor, *args):
+        """Produce a new type variable representing an instantiation
+        of the given type constructor, with the given arguments.
+
+        The type constructor should be a string; the arguments should
+        be type variables.
+        """
+        type_var = self.new_type_var()
+        self.__inferred_types[type_var] = Monotype(
+            (type_constructor,) + tuple(args))
+        return type_var
+
     def new_fn_type(self, x, y):
         """Produce a new type variable representing a function which
         takes type variable x to type variable y.
         """
-        type_var = self.new_type_var()
-        self.__inferred_types[type_var] = Monotype(('->', x, y))
-        #print 'Created new function type {0}'.format(type_var)
-        return type_var
+        return self.new_type_application('->', x, y)
 
     def specialize(self, polytype):
         """Specialize a polytype into a monotype by replacing any
