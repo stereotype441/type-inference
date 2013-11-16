@@ -131,6 +131,16 @@ class LetExpression(LambdaExpr):
                                           self.e2._pretty(0)))
 
 
+class BoolLiteral(LambdaExpr):
+    """Lambda calculus representation of a boolean literal."""
+    def __init__(self, value):
+        assert isinstance(value, bool)
+        self.value = value
+
+    def _pretty(self, precedence):
+        return '{0}'.format(self.value)
+
+
 class Monotype(object):
     def __init__(self, application = None):
         self.application = application
@@ -166,6 +176,9 @@ class TypeInferrer(object):
         # process, self.__env[name] is the polytype assigned to that
         # name.
         self.__env = {}
+
+        # Create built-in types
+        self.__bool_ty = self.new_type_application('Bool')
 
     def new_type_var(self):
         """Produce a new type variable with no meaning assigned to it
@@ -268,6 +281,8 @@ class TypeInferrer(object):
             # The inferred type of the resulting abstraction is
             # (var_type -> subexpr_type).
             result = self.new_fn_type(type_var, subexpr_type)
+        elif isinstance(expr, BoolLiteral):
+            result = self.__bool_ty
         else:
             assert False
         print 'Assigned {0} a type of {1}'.format(
@@ -291,6 +306,11 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
             ('->', 0, ('->', 1, 0)))
+
+    def test_bool(self):
+        self.check_single_expr(
+            BoolLiteral(True),
+            ('Bool',))
 
 
 if __name__ == '__main__':
