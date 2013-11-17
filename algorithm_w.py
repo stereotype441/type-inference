@@ -7,8 +7,7 @@
 
 import disjoint_set
 from lambda_calculus import (
-    Variable, LetExpression, LambdaAbstraction, BoolLiteral, Application,
-    parse)
+    Variable, LetExpression, LambdaAbstraction, Application, parse)
 import unittest
 
 
@@ -92,10 +91,7 @@ class TypeInferrer(object):
         # name.
         self.__env = {}
 
-        # Create built-in types
-        self.__bool_ty = self.new_type_application('Bool')
-
-        # Pre-load the environment with some built-in functions
+        # Pre-load the environment with some built-in symbols
         a = self.new_type_var(MonotypeVar())
         b = self.new_type_var(MonotypeVar())
         self.__env['mk_pair'] = self.generalize(
@@ -106,6 +102,10 @@ class TypeInferrer(object):
             self.new_fn_type(self.new_type_application('Pair', a, b), a))
         self.__env['snd'] = self.generalize(
             self.new_fn_type(self.new_type_application('Pair', a, b), b))
+        self.__env['True'] = self.generalize(
+            self.new_type_application('Bool'))
+        self.__env['False'] = self.generalize(
+            self.new_type_application('Bool'))
 
     def new_type_var(self, monotype):
         """Produce a new type variable whose meaning is the given
@@ -304,9 +304,6 @@ class TypeInferrer(object):
             # The inferred type of the resulting abstraction is
             # (var_type -> subexpr_type).
             result = self.new_fn_type(type_var, subexpr_type)
-            assert isinstance(result, disjoint_set.DisjointSet.element_type)
-        elif isinstance(expr, BoolLiteral):
-            result = self.__bool_ty
             assert isinstance(result, disjoint_set.DisjointSet.element_type)
         elif isinstance(expr, Application):
             # First infer the types of the LHS ("f") and RHS ("x") of

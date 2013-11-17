@@ -14,10 +14,6 @@ Expression grammar:
                 expression expression |
                 identifier
 
-Predefined literals:
-    True :: Bool
-    False :: Bool
-
 Predefined symbols:"""
     for name in sorted(type_inferrer.get_builtin_names()):
         expr = lambda_calculus.Variable(name)

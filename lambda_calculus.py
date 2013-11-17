@@ -223,12 +223,7 @@ def parse(s):
             return LetExpression(var, e1, e2)
         else:
             var = expect_identifier()
-            if var == 'True':
-                e1 = BoolLiteral(True)
-            elif var == 'False':
-                e1 = BoolLiteral(False)
-            else:
-                e1 = Variable(var)
+            e1 = Variable(var)
         if precedence < 1:
             while peek() not in (')', 'in', None):
                 e2 = consume_expression(1)
