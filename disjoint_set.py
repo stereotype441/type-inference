@@ -118,9 +118,6 @@ class DisjointSet(object):
           not have been invalidated by a more recent call to union()).
 
         - This call invalidates the subsets x and y.
-
-        TODO: could the above invaidation rule be type-checked by a
-        variant of Rust's ownership semantics?
         """
         assert x != y
         assert self.__parents[x] == x
