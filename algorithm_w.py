@@ -539,13 +539,16 @@ class TestTypeInference(unittest.TestCase):
         #
         # let ignore = \x . True
         # let ignore2 = \x . \y . True
-        # let unify = \x . \y . ignore (\z . ignore2 (z x) (z y))
+        # let second = \x . \y . y
+        # let unify = \x . \y . second (\z . ignore2 (z x) (z y)) x
         #
         # "ignore" has type "a -> Bool"; it ignores its argument and
         # returns a boolean.  "ignore2" has type "a -> b -> Bool"; it
-        # ignores two arguments and returns a boolean.  "unify" has
-        # type "a -> a -> Bool"; it forces its two arguments to have
-        # the same type, ignores them, and returns a boolean.
+        # ignores two arguments and returns a boolean.  "second" has
+        # type "a -> b -> b"; it ignores its first argument and
+        # returns its second.  "unify" has type "a -> a -> Bool"; it
+        # forces its two arguments to have the same type, and returns
+        # the first argument.
         #
         # This function wraps the given subexpressions in the
         # necessary "let" constructs so that it can refer to "ignore",
@@ -557,9 +560,12 @@ class TestTypeInference(unittest.TestCase):
                 'ignore2',
                 parse(r'\x . \y . True'),
                 LetExpression(
-                    'unify',
-                    parse(r'\x . \y . ignore (\z . ignore2 (z x) (z y))'),
-                    subexpr)))
+                    'second',
+                    parse(r'\x . \y . y'),
+                    LetExpression(
+                        'unify',
+                        parse(r'\x . \y . second (\z . ignore2 (z x) (z y)) x'),
+                        subexpr))))
 
     def test_ignore_func(self):
         # Check the type of the "ignore" function defined in
@@ -575,12 +581,19 @@ class TestTypeInference(unittest.TestCase):
             self.def_utils(parse('ignore2')),
             ('->', 0, ('->', 1, ('Bool',))))
 
+    def test_second_func(self):
+        # Check the type of the "second" function defined in
+        # def_utils().
+        self.check_single_expr(
+            self.def_utils(parse('second')),
+            ('->', 0, ('->', 1, 1)))
+
     def test_unify_func(self):
         # Check the type of the "unify" function defined in
         # def_utils().
         self.check_single_expr(
             self.def_utils(parse('unify')),
-            ('->', 0, ('->', 0, ('Bool',))))
+            ('->', 0, ('->', 0, 0)))
 
     def test_mutually_recursive_type(self):
         # A more complex example of an infinite type, involving the
