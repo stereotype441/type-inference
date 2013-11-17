@@ -33,5 +33,5 @@ print """Expression:
 
 has type:
 
-{1!r}
+{1}
 """.format(expr, algorithm_w.pretty_print_canonical_type(canonical_ty))
