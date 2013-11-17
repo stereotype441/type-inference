@@ -61,6 +61,18 @@ class TypeInferrer(object):
         # Create built-in types
         self.__bool_ty = self.new_type_application('Bool')
 
+        # Pre-load the environment with some built-in functions
+        a = self.new_type_var(Monotype())
+        b = self.new_type_var(Monotype())
+        self.__env['mk_pair'] = self.generalize(
+            self.new_fn_type(
+                a,
+                self.new_fn_type(b, self.new_type_application('Pair', a, b))))
+        self.__env['fst'] = self.generalize(
+            self.new_fn_type(self.new_type_application('Pair', a, b), a))
+        self.__env['snd'] = self.generalize(
+            self.new_fn_type(self.new_type_application('Pair', a, b), b))
+
     def new_type_var(self, monotype):
         """Produce a new type variable whose meaning is the given
         monotype.
@@ -644,6 +656,16 @@ class TestTypeInference(unittest.TestCase):
             ('->',
              ('->', 0, ('->', 1, 2)),
              ('->', ('->', 0, 1), ('->', 0, 2))))
+
+    def test_pairs(self):
+        # Check the types of the functions involving pairs:
+        #
+        # mk_pair :: a -> b -> (a, b)
+        # fst :: (a, b) -> a
+        # snd :: (a, b) -> b
+        self.check_single_expr(
+            parse('mk_pair'),
+            ('->', 0, ('->', 1, ('Pair', 0, 1))))
 
 
 if __name__ == '__main__':
