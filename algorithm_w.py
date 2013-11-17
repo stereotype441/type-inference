@@ -45,12 +45,16 @@ class MonotypeApp(Monotype):
 
 
 class Polytype(object):
-    def __init__(self, bound_vars, monotype_var):
-        self.bound_vars = bound_vars
+    """Representation of a polymorphic type, which should be
+    specialized each time it is used by replacing the "forall"
+    variables with new type variables.
+    """
+    def __init__(self, forall_vars, monotype_var):
+        self.forall_vars = forall_vars
         self.monotype_var = monotype_var
 
     def __repr__(self):
-        return 'Polytype({0!r}, {1!r})'.format(self.bound_vars,
+        return 'Polytype({0!r}, {1!r})'.format(self.forall_vars,
                                                self.monotype_var)
 
 
@@ -120,11 +124,11 @@ class TypeInferrer(object):
         """Specialize a polytype into a monotype by replacing any
         bound variables with brand new type variables.
         """
-        if len(polytype.bound_vars) == 0:
+        if len(polytype.forall_vars) == 0:
             return polytype.monotype_var
         else:
             assignments = {}
-            for v in polytype.bound_vars:
+            for v in polytype.forall_vars:
                 v_set = self.__type_sets.find(v)
                 assignments[v_set] = self.new_type_var(MonotypeVar())
             def specialize_part(type_variable):
@@ -165,7 +169,7 @@ class TypeInferrer(object):
         free_vars = set()
         for polytype in self.__env.itervalues():
             forall_vars = set()
-            for v in polytype.bound_vars:
+            for v in polytype.forall_vars:
                 type_set = self.__type_sets.find(v)
                 forall_vars.add(self.__type_sets.representative(type_set))
             free_vars.update(
