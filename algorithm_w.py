@@ -64,6 +64,17 @@ class TypeInferenceError(Exception):
 
 
 class TypeInferrer(object):
+    """Data structures and methods necessary to do type inference.
+
+    After constructing an object of this class, call visit() to
+    perform type inference on a lambda calculus expression.  The
+    inferred type is returned.
+
+    The data structure of the inferred type (Monotype) refers to
+    private data stored inside TypeInferrer.  To convert it to a
+    neutral representation, pass it to canonicalize().
+    """
+
     def __init__(self):
         # Each element of __type_sets is a type variable introduced by
         # type inference.  Each set in __type_sets is a set of type
@@ -125,12 +136,27 @@ class TypeInferrer(object):
         bound variables with brand new type variables.
         """
         if len(polytype.forall_vars) == 0:
+            # No specialization needed.
             return polytype.monotype_var
         else:
+            # Introduce a brand new type variable for each variable in
+            # the polytype that is qualified with "forall", and keep
+            # track of the mapping from old variables to new
+            # variables.
+            #
+            # Note: since the type in polytype.monotype_var arose out
+            # of a unification process, it may contain distinct type
+            # variables that have since been unified.  We need to
+            # treat any such variables as equivalent; so we actually
+            # keep track of the mapping from the old variables'
+            # equivalence sets to the new variables.
             assignments = {}
             for v in polytype.forall_vars:
                 v_set = self.__type_sets.find(v)
                 assignments[v_set] = self.new_type_var(MonotypeVar())
+
+            # Recursively substitute the new type variables for the
+            # old ones.
             def specialize_part(type_variable):
                 type_set = self.__type_sets.find(type_variable)
                 if type_set in assignments:
@@ -153,6 +179,16 @@ class TypeInferrer(object):
             return specialize_part(polytype.monotype_var)
 
     def find_free_vars_in_type(self, type_var):
+        """Find the set of free variables contained within a type.
+
+        Since the types participating in type inference are monotypes,
+        they don't contain "forall" qualifications, so all variables
+        appearing recursively within the type are free variables.
+
+        To account for unifications that have already been done, this
+        function actually returns a representative of each free type
+        set (computed by DisjointSet.representative()).
+        """
         free_vars = set()
         def recurse(type_var):
             type_set = self.__type_sets.find(type_var)
@@ -166,6 +202,17 @@ class TypeInferrer(object):
         return frozenset(free_vars)
 
     def find_free_vars_in_env(self):
+        """Find the set of free variables contained in the
+        environment.
+
+        Since the types in the environment are polytypes, we have to
+        be careful not to count "forall" qualified type variables as
+        free.
+
+        To account for unifications that have already been done, this
+        function actually returns a representative of each free type
+        set (computed by DisjointSet.representative()).
+        """
         free_vars = set()
         for polytype in self.__env.itervalues():
             forall_vars = set()
@@ -178,8 +225,9 @@ class TypeInferrer(object):
         return frozenset(free_vars)
 
     def generalize(self, type_var):
-        """Generalize a type variable into a polytype, by quantifying
-        all variables that are free in type_var but not free in env.
+        """Generalize a type variable into a polytype, by "forall"
+        qualifying all variables that are free in type_var but not
+        free in env.
         """
         free_vars = (self.find_free_vars_in_type(type_var) -
                      self.find_free_vars_in_env())
@@ -216,6 +264,9 @@ class TypeInferrer(object):
             return types_seen[type_var]
 
     def visit_with_binding(self, var, binding, expr):
+        """Temporarily bind var to binding in the environment, and
+        visit expr.
+        """
         # If the new declaration shadows a previous declaration with
         # the same variable name, save the type of the old variable.
         old_binding = self.__env.get(var)
@@ -232,6 +283,7 @@ class TypeInferrer(object):
         return result
 
     def visit(self, expr):
+        """Visit the given expression and infer a type for it."""
         if isinstance(expr, Variable):
             # Look up the type bound to the variable name; if it was
             # introduced by a let expression we need to specialize it.
