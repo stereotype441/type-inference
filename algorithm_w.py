@@ -110,6 +110,18 @@ class TypeInferrer(object):
             self.new_fn_type(
                 self.new_type_application('Bool'),
                 self.new_fn_type(a, self.new_fn_type(a, a))))
+        self.__env['maybe'] = self.generalize(
+            self.new_fn_type(
+                b,
+                self.new_fn_type(
+                    self.new_fn_type(a, b),
+                    self.new_fn_type(
+                        self.new_type_application('Maybe', a),
+                        b))))
+        self.__env['Nothing'] = self.generalize(
+            self.new_type_application('Maybe', a))
+        self.__env['Just'] = self.generalize(
+            self.new_fn_type(a, self.new_type_application('Maybe', a)))
 
     def new_type_var(self, monotype):
         """Produce a new type variable whose meaning is the given
@@ -866,6 +878,11 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             self.def_utils(parse(r"\x . unify x x")),
             ('->', 0, 0))
+
+    def test_isJust(self):
+        self.check_single_expr(
+            parse(r'maybe False (\x . True)'),
+            ('->', ('Maybe', 0), ('Bool',)))
 
 
 if __name__ == '__main__':
