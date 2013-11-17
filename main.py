@@ -2,6 +2,8 @@ import algorithm_w
 import lambda_calculus
 import sys
 
+type_inferrer = algorithm_w.TypeInferrer()
+
 if len(sys.argv) != 2:
     print """Usage: python main.py <expression>
 
@@ -16,15 +18,16 @@ Predefined literals:
     True :: Bool
     False :: Bool
 
-Predefined functions:
-    mk_pair :: a -> b -> (a, b)
-    fst :: (a, b) -> a
-    snd :: (a, b) -> b
-"""
+Predefined symbols:"""
+    for name in sorted(type_inferrer.get_builtin_names()):
+        expr = lambda_calculus.Variable(name)
+        ty = type_inferrer.visit(expr)
+        canonical_ty = type_inferrer.canonicalize(ty, {})
+        print '    {0} :: {1}'.format(
+            name, algorithm_w.pretty_print_canonical_type(canonical_ty))
     exit(1)
 
 expr = lambda_calculus.parse(sys.argv[1])
-type_inferrer = algorithm_w.TypeInferrer()
 ty = type_inferrer.visit(expr)
 canonical_ty = type_inferrer.canonicalize(ty, {})
 

@@ -416,6 +416,10 @@ class TypeInferrer(object):
                 'all sets are {0!r}, but inferred_types has keys {1!r}'.format(
                     all_sets, inferred_types_keys))
 
+    def get_builtin_names(self):
+        """Find out the names of the built-in symbols."""
+        return self.__env.keys()
+
 
 def pretty_print_canonical_type(ty, precedence = 0):
     """Pretty print a return value from TypeInferrer.canonicalize().
