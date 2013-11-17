@@ -325,7 +325,6 @@ class TypeInferrer(object):
         if old_binding is None:
             del self.__env[var]
         else:
-            assert False
             self.__env[var] = old_binding
 
         return result
@@ -391,7 +390,7 @@ class TypeInferrer(object):
             result = self.visit_with_binding(expr.var, polytype, expr.e2)
             assert isinstance(result, int)
         else:
-            assert False
+            assert False # Unrecognized lambda expression.
         print 'Assigned {0} a type of {1}'.format(
             expr, self.canonicalize(result, {}))
         return result
@@ -434,6 +433,8 @@ class TypeInferrer(object):
 
 # TODO: many of these tests would be far easier to read if I
 # implemented a parser for lambda expressions.
+#
+# TODO: too many of these tests yield a final type of (a -> a).
 class TestTypeInference(unittest.TestCase):
     def check_single_expr(self, expr, expected_type):
         ti = TypeInferrer()
@@ -666,6 +667,26 @@ class TestTypeInference(unittest.TestCase):
                         'g',
                         Application(Variable('f'), BoolLiteral(True)),
                         Variable('g')))),
+            ('->', 0, 0))
+
+    def test_lambda_shadowing(self):
+        # When a lambda expression redefines a variable bound in an
+        # outer expression, the outer definition needs to be restored
+        # once the lambda expression is exited.  For example, in:
+        #
+        # (\x . (\x . x True) (\y . x))
+        #
+        # The "x" appearing inside "(\x . x True)" has type "Bool ->
+        # a", whereas the "x" appearing inside "(\y . x)" has type
+        # "a", giving the entire expression type "a -> a".
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                Application(
+                    LambdaAbstraction(
+                        'x',
+                        Application(Variable('x'), BoolLiteral(True))),
+                    LambdaAbstraction('y', Variable('x')))),
             ('->', 0, 0))
 
 
