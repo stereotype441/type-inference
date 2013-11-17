@@ -330,7 +330,6 @@ class TypeInferrer(object):
                     all_sets, inferred_types_keys))
 
 
-# TODO: too many of these tests yield a final type of (a -> a).
 class TestTypeInference(unittest.TestCase):
     def check_single_expr(self, expr, expected_type):
         ti = TypeInferrer()
@@ -696,6 +695,40 @@ class TestTypeInference(unittest.TestCase):
             parse(r'\f . \p . f (fst p) (snd p)'),
             ('->', ('->', 0, ('->', 1, 2)), ('->', ('Pair', 0, 1), 2)))
 
+    def test_let_partial_generalization_with_utils(self):
+        # More thorough test of "let" partial specialization using
+        # utility functions.
+        expr = parse(r"""
+            \x . \y . \z .
+            let const_x = \w . x in
+                mk_pair (mk_pair (unify const_x (mk_fn y True))
+                                 (unify const_x
+                                        (mk_fn (mk_pair True False) z)))
+                        const_x
+            """)
+        # In the expression above, if "x" has type "a", "y" has type
+        # "b", and "z" has type "c", then "const_x" is initially
+        # assigned type "forall d . d -> a".  On its first use it is
+        # unified with "b -> Bool", forcing "a" to be "Bool".  On its
+        # second use, it is unified with "(Bool, Bool) -> c", forcing
+        # "c" to be "Bool".  Note that since "d" is qualified with
+        # "forall", "b" is not unified with "(Bool, Bool)".  Therefore
+        # the type of the final expression should be:
+        #
+        # Bool -> b -> Bool -> ((b -> Bool, (Bool, Bool) -> Bool), d -> Bool)
+        self.check_single_expr(
+            self.def_utils(expr),
+            ('->',
+             ('Bool',),
+             ('->',
+              0,
+              ('->',
+               ('Bool',),
+               ('Pair',
+                ('Pair',
+                 ('->', 0, ('Bool',)),
+                 ('->', ('Pair', ('Bool',), ('Bool',)), ('Bool',))),
+                ('->', 1, ('Bool',)))))))
 
 if __name__ == '__main__':
     unittest.main()
