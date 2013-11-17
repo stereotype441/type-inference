@@ -106,6 +106,10 @@ class TypeInferrer(object):
             self.new_type_application('Bool'))
         self.__env['False'] = self.generalize(
             self.new_type_application('Bool'))
+        self.__env['if'] = self.generalize(
+            self.new_fn_type(
+                self.new_type_application('Bool'),
+                self.new_fn_type(a, self.new_fn_type(a, a))))
 
     def new_type_var(self, monotype):
         """Produce a new type variable whose meaning is the given
