@@ -22,6 +22,11 @@ class DisjointSet(object):
     typed language where we want to represent elements and sets using
     different types.
 
+    I have also added two functions not present in the Wikipedia text:
+    get_all_sets() (which yields all sets contained in the data
+    structure), and representative() (which maps a set to one of its
+    elements).
+
     This implementation uses disjoint-set forests, with the "union by
     rank" and "path compression" optimizations.  This permits an
     amortized running time per operation of O(alpha(n)), where alpha
@@ -166,13 +171,19 @@ class DisjointSet(object):
                 assert 2 ** (self.__ranks[x] - 1) < n
 
     def get_all_sets(self):
-        # TODO: test
+        """Yield all sets contained in the data structure."""
         for x in xrange(len(self.__parents)):
             if self.__parents[x] == x:
                 yield x
 
     def representative(self, x):
-        # TODO: test
+        """Given a set, return one of its elements.
+
+        Note: since we represent a set by its root element, this is
+        just the identity function.  However, that is an
+        implementation detail which we don't want to leak to the
+        client.
+        """
         return x
 
 
@@ -190,10 +201,17 @@ class TestDisjointSets(unittest.TestCase):
         s2 = ds.find(e2)
         ds.check_ranks()
         self.assertNotEqual(s1, s2)
+        sets = set(ds.get_all_sets())
+        self.assertEqual(sets, set([s1, s2]))
+        self.assertEqual(ds.representative(s1), e1)
+        self.assertEqual(ds.representative(s2), e2)
         s1_2 = ds.union(s1, s2)
         ds.check_ranks()
         self.assertEqual(ds.find(e1), s1_2)
         self.assertEqual(ds.find(e2), s1_2)
+        sets = set(ds.get_all_sets())
+        self.assertEqual(sets, set([s1_2]))
+        self.assertTrue(ds.representative(s1_2) in [e1, e2])
 
     def test_left_unions(self):
         """Test accumulating a union of 10 elements, where each new
