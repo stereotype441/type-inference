@@ -420,7 +420,6 @@ class TypeInferrer(object):
             # Make sure we don't create infinite types.
             if monotype_x.application is not None and \
                     self.occurs_in(set_y, monotype_x.application):
-                assert False
                 raise TypeInferenceError(
                     "Unifying {0!r} would create infinite type".format(
                         monotype_x.application))
@@ -844,6 +843,36 @@ class TestTypeInference(unittest.TestCase):
                             Application(
                                 Application(Variable('unify'), Variable('g')),
                                 LambdaAbstraction('x', Variable('f'))))))))
+
+    def test_infinite_type_left(self):
+        # Check that producing an infinite type by unifying "a" with
+        # "a -> b" produces an error.  We do so by attempting to
+        # type-check the expression:
+        #
+        # (\f . unify f (\x . f))
+        self.check_type_error(
+            self.def_utils(
+                LambdaAbstraction(
+                    'f',
+                    Application(
+                        Application(Variable('unify'), Variable('f')),
+                        LambdaAbstraction('x', Variable('f'))))))
+
+    def test_infinite_type_right(self):
+        # Check that producing an infinite type by unifying "a -> b"
+        # with "a" produces an error.  We do so by attempting to
+        # type-check the expression:
+        #
+        # (\f . unify (\x . f) f)
+        self.check_type_error(
+            self.def_utils(
+                LambdaAbstraction(
+                    'f',
+                    Application(
+                        Application(
+                            Variable('unify'),
+                            LambdaAbstraction('x', Variable('f'))),
+                        Variable('f')))))
 
 
 if __name__ == '__main__':
