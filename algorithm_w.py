@@ -395,15 +395,41 @@ class TypeInferrer(object):
             expr, self.canonicalize(result, {}))
         return result
 
+    def occurs_in(self, type_set, application):
+        # Determine whether a type variable in the set "type_set"
+        # appears anywhere in "application".  This is used to avoid
+        # creating infinite types.
+        for i in xrange(1, len(application)):
+            set_i = self.__type_sets.find(application[i])
+            if set_i == type_set:
+                return True
+            monotype_i = self.__inferred_types[set_i]
+            if monotype_i.application is not None and \
+                    self.occurs_in(type_set, monotype_i.application):
+                assert False
+                return True
+        return False
+
     def unify(self, type_x, type_y):
         print 'unify({0}, {1})'.format(type_x, type_y)
         self.check_invariants()
-        # TODO: detect infinite types ("occurs check")
         set_x = self.__type_sets.find(type_x)
         set_y = self.__type_sets.find(type_y)
         monotype_x = self.__inferred_types[set_x]
         monotype_y = self.__inferred_types[set_y]
         if monotype_x.application is None or monotype_y.application is None:
+            # Make sure we don't create infinite types.
+            if monotype_x.application is not None and \
+                    self.occurs_in(set_y, monotype_x.application):
+                assert False
+                raise TypeInferenceError(
+                    "Unifying {0!r} would create infinite type".format(
+                        monotype_x.application))
+            if monotype_y.application is not None and \
+                    self.occurs_in(set_x, monotype_y.application):
+                raise TypeInferenceError(
+                    "Unifying {0!r} would create infinite type".format(
+                        monotype_y.application))
             del self.__inferred_types[set_x]
             del self.__inferred_types[set_y]
             new_set = self.__type_sets.union(set_x, set_y)
@@ -709,6 +735,19 @@ class TestTypeInference(unittest.TestCase):
                         Variable('x')),
                     Variable('x'))),
             ('->', 0, 0))
+
+    def test_infinite_type(self):
+        # Applying a function to itself produces an infinite type.
+        # For example, in the expression:
+        #
+        # (\f . f f)
+        #
+        # if "f" has type "a", then in order to apply "f" to itself,
+        # "a" must be unified with "a -> b".  It's impossible to do
+        # this without creating an infinitely recursive type, which we
+        # don't permit.
+        self.check_type_error(
+            LambdaAbstraction('f', Application(Variable('f'), Variable('f'))))
 
 
 if __name__ == '__main__':
