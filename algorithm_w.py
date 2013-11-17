@@ -522,7 +522,28 @@ class TestTypeInference(unittest.TestCase):
                     Application(Variable('f'), Variable('x')))),
             ('->', ('->', ('Bool',), ('Bool',)), ('Bool',)))
 
-    # TODO: test that "let" generalizes properly.
+    def test_let_generalization(self):
+        # Check that variables bound with "let" can be used in a
+        # general fashion.  For example, in:
+        #
+        # let id = \x . x in (id (\x . x)) (id True)
+        #
+        # The first usage of "id" has type "(Bool -> Bool) -> (Bool ->
+        # Bool)", and the second usage has type "Bool -> Bool", giving
+        # the final expression type "Bool".
+        self.check_single_expr(
+            LetExpression(
+                'id',
+                LambdaAbstraction('x', Variable('x')),
+                Application(
+                    Application(
+                        Variable('id'),
+                        LambdaAbstraction('x', Variable('x'))),
+                    Application(Variable('id'), BoolLiteral(True)))),
+            ('Bool',))
+
+    # TODO: test that variables bound with lambda can't be used in a
+    # general fashion.
 
 
 if __name__ == '__main__':
