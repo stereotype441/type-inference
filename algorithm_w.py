@@ -250,23 +250,39 @@ class TypeInferrer(object):
                             return new_type
             return specialize_part(polytype.monotype_var)
 
-    def generalize(self, type_var):
-        """Generalize a type variable into a polytype, by quantifying
-        all free variables with "forall".
-        """
-        # TODO: this algorithm is wrong--it erroneously marks
-        # variables as free even if they are bound in the environment.
+    def find_free_vars_in_type(self, type_var):
         free_vars = set()
-        def find_free_vars(type_var):
+        def recurse(type_var):
             type_set = self.__type_sets.find(type_var)
             monotype = self.__inferred_types[type_set]
             if monotype.application is None:
                 free_vars.add(self.__type_sets.representative(type_set))
             else:
                 for i in xrange(1, len(monotype.application)):
-                    find_free_vars(monotype.application[i])
-        find_free_vars(type_var)
-        return Polytype(frozenset(free_vars), type_var)
+                    recurse(monotype.application[i])
+        recurse(type_var)
+        return frozenset(free_vars)
+
+    def find_free_vars_in_env(self):
+        free_vars = set()
+        for polytype in self.__env.itervalues():
+            forall_vars = set()
+            for v in polytype.bound_vars:
+                assert False
+                type_set = self.__type_sets.find(type_var)
+                forall_vars.add(self.__type_sets.representative(type_set))
+            free_vars.update(
+                self.find_free_vars_in_type(polytype.monotype_var) -
+                forall_vars)
+        return frozenset(free_vars)
+
+    def generalize(self, type_var):
+        """Generalize a type variable into a polytype, by quantifying
+        all variables that are free in type_var but not free in env.
+        """
+        free_vars = (self.find_free_vars_in_type(type_var) -
+                     self.find_free_vars_in_env())
+        return Polytype(free_vars, type_var)
 
     def canonicalize(self, type_var, types_seen):
         """Convert a type variable into a string representing the type
@@ -475,6 +491,38 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             LetExpression('t', BoolLiteral(True), Variable('t')),
             ('Bool',))
+
+    def test_let_non_generalization(self):
+        # When a variable bound with "let" is generalized, types that
+        # are constrained by declarations in enclosing scopes should
+        # not be generalized.  For example, in:
+        #
+        # (\f . let x = f True in f x)
+        #
+        # "let x = f True" constrains f to have type "Bool -> a",
+        # giving "x" a type of "a".  Then, "in f x" constrains "x" to
+        # have type Bool.  Therefore, "f"'s type becomes "Bool ->
+        # Bool", and the final expression should have type "((Bool ->
+        # Bool) -> Bool)".
+        #
+        # If, at the time of the let-binding, we had over-generalized
+        # the type of "x" to "forall a. a", then when "x" was used in
+        # "in f x", it would have been specialized to a new type
+        # variable "b", which would have been constrained to have type
+        # "Bool", but "a" would have remained general.  Therefore,
+        # "f"'s type would have been "Bool -> a", and the final
+        # expressino would have had type "((Bool -> a) -> a)", which
+        # is incorrect.
+        self.check_single_expr(
+            LambdaAbstraction(
+                'f',
+                LetExpression(
+                    'x',
+                    Application(Variable('f'), BoolLiteral(True)),
+                    Application(Variable('f'), Variable('x')))),
+            ('->', ('->', ('Bool',), ('Bool',)), ('Bool',)))
+
+    # TODO: test that "let" generalizes properly.
 
 
 if __name__ == '__main__':
