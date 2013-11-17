@@ -471,6 +471,11 @@ class TestTypeInference(unittest.TestCase):
                 Application(Variable('const'), BoolLiteral(True))),
             ('->', 0, ('Bool',)))
 
+    def test_let_with_bool(self):
+        self.check_single_expr(
+            LetExpression('t', BoolLiteral(True), Variable('t')),
+            ('Bool',))
+
 
 if __name__ == '__main__':
     unittest.main()
