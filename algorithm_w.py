@@ -7,7 +7,8 @@
 
 import disjoint_set
 from lambda_calculus import (
-    Variable, LetExpression, LambdaAbstraction, BoolLiteral, Application)
+    Variable, LetExpression, LambdaAbstraction, BoolLiteral, Application,
+    parse)
 import unittest
 
 
@@ -330,9 +331,6 @@ class TypeInferrer(object):
                     all_sets, inferred_types_keys))
 
 
-# TODO: many of these tests would be far easier to read if I
-# implemented a parser for lambda expressions.
-#
 # TODO: too many of these tests yield a final type of (a -> a).
 class TestTypeInference(unittest.TestCase):
     def check_single_expr(self, expr, expected_type):
@@ -355,40 +353,36 @@ class TestTypeInference(unittest.TestCase):
 
     def test_identity(self):
         self.check_single_expr(
-            LambdaAbstraction('x', Variable('x')),
+            parse(r'\x . x'),
             ('->', 0, 0))
 
     def test_const(self):
         self.check_single_expr(
-            LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
+            parse(r'\x . \y . x'),
             ('->', 0, ('->', 1, 0)))
 
     def test_bool(self):
         self.check_single_expr(
-            BoolLiteral(True),
+            parse('True'),
             ('Bool',))
 
     def test_const_application(self):
         self.check_single_expr(
-            Application(
-                LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
-                BoolLiteral(True)),
+            parse(r'(\x . \y . x) True'),
             ('->', 0, ('Bool',)))
 
     def test_bad_application(self):
-        self.check_type_error(Application(BoolLiteral(True), BoolLiteral(False)))
+        self.check_type_error(
+            parse('True False'))
 
     def test_simple_let(self):
         self.check_single_expr(
-            LetExpression(
-                'const',
-                LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
-                Application(Variable('const'), BoolLiteral(True))),
+            parse(r'let const = \x . \y . x in const True'),
             ('->', 0, ('Bool',)))
 
     def test_let_with_bool(self):
         self.check_single_expr(
-            LetExpression('t', BoolLiteral(True), Variable('t')),
+            parse('let t = True in t'),
             ('Bool',))
 
     def test_let_non_generalization(self):
@@ -413,12 +407,7 @@ class TestTypeInference(unittest.TestCase):
         # expressino would have had type "((Bool -> a) -> a)", which
         # is incorrect.
         self.check_single_expr(
-            LambdaAbstraction(
-                'f',
-                LetExpression(
-                    'x',
-                    Application(Variable('f'), BoolLiteral(True)),
-                    Application(Variable('f'), Variable('x')))),
+            parse(r'\f . let x = f True in f x'),
             ('->', ('->', ('Bool',), ('Bool',)), ('Bool',)))
 
     def test_let_generalization(self):
@@ -431,14 +420,7 @@ class TestTypeInference(unittest.TestCase):
         # Bool)", and the second usage has type "Bool -> Bool", giving
         # the final expression type "Bool".
         self.check_single_expr(
-            LetExpression(
-                'id',
-                LambdaAbstraction('x', Variable('x')),
-                Application(
-                    Application(
-                        Variable('id'),
-                        LambdaAbstraction('x', Variable('x'))),
-                    Application(Variable('id'), BoolLiteral(True)))),
+            parse(r'let id = \x . x in (id (\x . x)) (id True)'),
             ('Bool',))
 
     def test_lambda_non_generalization(self):
@@ -452,13 +434,7 @@ class TestTypeInference(unittest.TestCase):
         # whereas the second usage must have type "Bool -> c", and
         # these can't be unified.
         self.check_type_error(
-            LambdaAbstraction(
-                'f',
-                Application(
-                    Application(
-                        Variable('f'),
-                        LambdaAbstraction('x', Variable('x'))),
-                    Application(Variable('f'), BoolLiteral(True)))))
+            parse(r'\f . (f (\x . x)) (f True)'))
 
     def test_let_partial_generalization_general_part(self):
         # In some situations, "let" may generalize some of its type
@@ -474,18 +450,7 @@ class TestTypeInference(unittest.TestCase):
         # not work if the type assigned to "const_x" did not include
         # "forall b".
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                LetExpression(
-                    'const_x',
-                    LambdaAbstraction('y', Variable('x')),
-                    Application(
-                        Variable('const_x'),
-                        LambdaAbstraction(
-                            'z',
-                            Application(
-                                Variable('const_x'),
-                                BoolLiteral(True)))))),
+            parse(r'\x . let const_x = \y . x in const_x (\z . const_x True)'),
             ('->', 0, 0))
 
     def test_let_partial_generalization_non_general_part(self):
@@ -505,18 +470,7 @@ class TestTypeInference(unittest.TestCase):
         # been present, then unification would not have occurred, and
         # the type would have been "a -> a".
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                LetExpression(
-                    'const_x',
-                    LambdaAbstraction('y', Variable('x')),
-                    Application(
-                        Variable('const_x'),
-                        Application(
-                            Application(
-                                Variable('const_x'),
-                                LambdaAbstraction('z', Variable('z'))),
-                            BoolLiteral(True))))),
+            parse(r'\x . let const_x = \y . x in const_x ((const_x (\z . z)) True)'),
             ('->', ('->', ('Bool',), 0), ('->', ('Bool',), 0)))
 
     def test_partial_specialization(self):
@@ -533,16 +487,7 @@ class TestTypeInference(unittest.TestCase):
         # final type of the whole expression should be "(a -> b) -> (a
         # -> b)".
         self.check_single_expr(
-            LambdaAbstraction(
-                'f',
-                LetExpression(
-                    'g',
-                    LambdaAbstraction(
-                        'x',
-                        LambdaAbstraction(
-                            'y',
-                            Application(Variable('f'), Variable('y')))),
-                    Application(Variable('g'), BoolLiteral(True)))),
+            parse(r'\f . let g = \x . \y . f y in g True'),
             ('->', ('->', 0, 1), ('->', 0, 1)))
 
     def test_nested_lets(self):
@@ -557,15 +502,7 @@ class TestTypeInference(unittest.TestCase):
         # "forall a . a".  Therefore the whole expression has type (a
         # -> a).
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                LetExpression(
-                    'f',
-                    LambdaAbstraction('y', Variable('x')),
-                    LetExpression(
-                        'g',
-                        Application(Variable('f'), BoolLiteral(True)),
-                        Variable('g')))),
+            parse(r'\x . let f = \y . x in let g = f True in g'),
             ('->', 0, 0))
 
     def test_lambda_shadowing(self):
@@ -579,13 +516,7 @@ class TestTypeInference(unittest.TestCase):
         # a", whereas the "x" appearing inside "(\y . x)" has type
         # "a", giving the entire expression type "a -> a".
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                Application(
-                    LambdaAbstraction(
-                        'x',
-                        Application(Variable('x'), BoolLiteral(True))),
-                    LambdaAbstraction('y', Variable('x')))),
+            parse(r'\x . (\x . x True) (\y . x)'),
             ('->', 0, 0))
 
     def test_let_shadowing(self):
@@ -599,14 +530,7 @@ class TestTypeInference(unittest.TestCase):
         # "forall b . b -> b", whereas the "x" appearing at the end
         # has type "a", giving the entire expression type "a -> a".
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                Application(
-                    LetExpression(
-                        'x',
-                        LambdaAbstraction('y', Variable('y')),
-                        Variable('x')),
-                    Variable('x'))),
+            parse(r'\x . (let x = \y . y in x) x'),
             ('->', 0, 0))
 
     def test_infinite_type(self):
@@ -620,7 +544,7 @@ class TestTypeInference(unittest.TestCase):
         # this without creating an infinitely recursive type, which we
         # don't permit.
         self.check_type_error(
-            LambdaAbstraction('f', Application(Variable('f'), Variable('f'))))
+            parse(r'\f . f f'))
 
     def def_utils(self, subexpr):
         # Some useful utility functions for testing complex
@@ -641,52 +565,34 @@ class TestTypeInference(unittest.TestCase):
         # "ignore2", and "unify".
         return LetExpression(
             'ignore',
-            LambdaAbstraction('x', BoolLiteral(True)),
+            parse(r'\x . True'),
             LetExpression(
                 'ignore2',
-                LambdaAbstraction(
-                    'x',
-                    LambdaAbstraction('y', BoolLiteral(True))),
+                parse(r'\x . \y . True'),
                 LetExpression(
                     'unify',
-                    LambdaAbstraction(
-                        'x',
-                        LambdaAbstraction(
-                            'y',
-                            Application(
-                                Variable('ignore'),
-                                LambdaAbstraction(
-                                    'z',
-                                    Application(
-                                        Application(
-                                            Variable('ignore2'),
-                                            Application(
-                                                Variable('z'),
-                                                Variable('x'))),
-                                        Application(
-                                            Variable('z'),
-                                            Variable('y'))))))),
+                    parse(r'\x . \y . ignore (\z . ignore2 (z x) (z y))'),
                     subexpr)))
 
     def test_ignore_func(self):
         # Check the type of the "ignore" function defined in
         # def_utils().
         self.check_single_expr(
-            self.def_utils(Variable('ignore')),
+            self.def_utils(parse('ignore')),
             ('->', 0, ('Bool',)))
 
     def test_ignore2_func(self):
         # Check the type of the "ignore2" function defined in
         # def_utils().
         self.check_single_expr(
-            self.def_utils(Variable('ignore2')),
+            self.def_utils(parse('ignore2')),
             ('->', 0, ('->', 1, ('Bool',))))
 
     def test_unify_func(self):
         # Check the type of the "unify" function defined in
         # def_utils().
         self.check_single_expr(
-            self.def_utils(Variable('unify')),
+            self.def_utils(parse('unify')),
             ('->', 0, ('->', 0, ('Bool',))))
 
     def test_mutually_recursive_type(self):
@@ -703,21 +609,7 @@ class TestTypeInference(unittest.TestCase):
         # two types; which produces an infinite type.
         self.check_type_error(
             self.def_utils(
-                LambdaAbstraction(
-                    'f',
-                    LambdaAbstraction(
-                        'g',
-                        Application(
-                            Application(
-                                Variable('ignore2'),
-                                Application(
-                                    Application(
-                                        Variable('unify'),
-                                        Variable('f')),
-                                    LambdaAbstraction('x', Variable('g')))),
-                            Application(
-                                Application(Variable('unify'), Variable('g')),
-                                LambdaAbstraction('x', Variable('f'))))))))
+                parse(r'\f . \g . ignore2 (unify f (\x . g)) (unify g (\x . f))')))
 
     def test_infinite_type_left(self):
         # Check that producing an infinite type by unifying "a" with
@@ -727,11 +619,7 @@ class TestTypeInference(unittest.TestCase):
         # (\f . unify f (\x . f))
         self.check_type_error(
             self.def_utils(
-                LambdaAbstraction(
-                    'f',
-                    Application(
-                        Application(Variable('unify'), Variable('f')),
-                        LambdaAbstraction('x', Variable('f'))))))
+                parse(r'\f . unify f (\x . f)')))
 
     def test_infinite_type_right(self):
         # Check that producing an infinite type by unifying "a -> b"
@@ -741,13 +629,7 @@ class TestTypeInference(unittest.TestCase):
         # (\f . unify (\x . f) f)
         self.check_type_error(
             self.def_utils(
-                LambdaAbstraction(
-                    'f',
-                    Application(
-                        Application(
-                            Variable('unify'),
-                            LambdaAbstraction('x', Variable('f'))),
-                        Variable('f')))))
+                parse(r'\f . unify (\x . f) f')))
 
     def test_s_combinator(self):
         # Check the type of the "S" combinator:
@@ -758,15 +640,7 @@ class TestTypeInference(unittest.TestCase):
         #
         # (a -> b -> c) -> (a -> b) -> a -> c
         self.check_single_expr(
-            LambdaAbstraction(
-                'x',
-                LambdaAbstraction(
-                    'y',
-                    LambdaAbstraction(
-                        'z',
-                        Application(
-                            Application(Variable('x'), Variable('z')),
-                            Application(Variable('y'), Variable('z')))))),
+            parse(r'\x . \y . \z . x z (y z)'),
             ('->',
              ('->', 0, ('->', 1, 2)),
              ('->', ('->', 0, 1), ('->', 0, 2))))
