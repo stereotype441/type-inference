@@ -172,7 +172,6 @@ class TypeInferrer(object):
         (and passing in {} for types_seen) produces the result ('->',
         0, ('->', 1, 0)).
         """
-        #print type_var, self.__inferred_types
         type_var = self.__type_sets.find(type_var)
         monotype = self.__inferred_types[type_var]
         if monotype.application is not None:
@@ -251,8 +250,6 @@ class TypeInferrer(object):
 
             # Generate a new monotype to represent the bound variable.
             polytype = self.generalize(e1_type)
-            print polytype
-            print self.__inferred_types
 
             # Visit the second expression and allow it to use the
             # bound variable.
@@ -260,8 +257,6 @@ class TypeInferrer(object):
             assert isinstance(result, int)
         else:
             assert False # Unrecognized lambda expression.
-        print 'Assigned {0} a type of {1}'.format(
-            expr, self.canonicalize(result, {}))
         return result
 
     def occurs_in(self, type_set, application):
@@ -279,7 +274,6 @@ class TypeInferrer(object):
         return False
 
     def unify(self, type_x, type_y):
-        print 'unify({0}, {1})'.format(type_x, type_y)
         self.check_invariants()
         set_x = self.__type_sets.find(type_x)
         set_y = self.__type_sets.find(type_y)
