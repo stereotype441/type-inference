@@ -288,7 +288,7 @@ class TypeInferrer(object):
             # Look up the type bound to the variable name; if it was
             # introduced by a let expression we need to specialize it.
             result = self.specialize(self.__env[expr.name])
-            assert isinstance(result, int)
+            assert isinstance(result, disjoint_set.DisjointSet.element_type)
         elif isinstance(expr, LambdaAbstraction):
             # Generate a new monotype to represent the bound variable.
             type_var = self.new_type_var(MonotypeVar())
@@ -304,10 +304,10 @@ class TypeInferrer(object):
             # The inferred type of the resulting abstraction is
             # (var_type -> subexpr_type).
             result = self.new_fn_type(type_var, subexpr_type)
-            assert isinstance(result, int)
+            assert isinstance(result, disjoint_set.DisjointSet.element_type)
         elif isinstance(expr, BoolLiteral):
             result = self.__bool_ty
-            assert isinstance(result, int)
+            assert isinstance(result, disjoint_set.DisjointSet.element_type)
         elif isinstance(expr, Application):
             # First infer the types of the LHS ("f") and RHS ("x") of
             # the application.
@@ -325,7 +325,7 @@ class TypeInferrer(object):
             # Unify that with the type that we've already inferred for
             # f.
             self.unify(f_type, f_type_to_unify)
-            assert isinstance(result, int)
+            assert isinstance(result, disjoint_set.DisjointSet.element_type)
         elif isinstance(expr, LetExpression):
             # Infer the type of the expression to be bound.
             e1_type = self.visit(expr.e1)
@@ -336,7 +336,7 @@ class TypeInferrer(object):
             # Visit the second expression and allow it to use the
             # bound variable.
             result = self.visit_with_binding(expr.var, polytype, expr.e2)
-            assert isinstance(result, int)
+            assert isinstance(result, disjoint_set.DisjointSet.element_type)
         else:
             assert False # Unrecognized lambda expression.
         return result
