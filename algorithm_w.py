@@ -68,7 +68,6 @@ class LambdaExpr(object):
     @staticmethod
     def _paren_if(parens_needed, s):
         if parens_needed:
-            assert False
             return '({0})'.format(s)
         else:
             return s
@@ -91,12 +90,10 @@ class Application(LambdaExpr):
     (a.k.a. "function call").
     """
     def __init__(self, f, x):
-        assert False
         self.f = f
         self.x = x
 
     def _pretty(self, precedence):
-        assert False
         return self._paren_if(
             precedence >= 3,
             '{0} {1}'.format(self.f._pretty(2), self.x._pretty(3)))
@@ -158,7 +155,6 @@ class Polytype(object):
         self.monotype_var = monotype_var
 
 
-# TODO: detect infinite types ("occurs check")
 class TypeInferrer(object):
     def __init__(self):
         # Each element of __type_sets is a type variable introduced by
@@ -283,11 +279,66 @@ class TypeInferrer(object):
             result = self.new_fn_type(type_var, subexpr_type)
         elif isinstance(expr, BoolLiteral):
             result = self.__bool_ty
+        elif isinstance(expr, Application):
+            # First infer the types of the LHS ("f") and RHS ("x") of
+            # the application.
+            f_type = self.visit(expr.f)
+            x_type = self.visit(expr.x)
+
+            # Create a new type variable to represent the result of
+            # the function application.
+            result = self.new_type_var()
+            monotype = Monotype()
+            self.__inferred_types[result] = monotype
+
+            # Figure out what the type of "f" must be given the type
+            # of "x" and the result type.
+            f_type_to_unify = self.new_fn_type(x_type, result)
+
+            # Unify that with the type that we've already inferred for
+            # f.
+            self.unify(f_type, f_type_to_unify)
         else:
             assert False
         print 'Assigned {0} a type of {1}'.format(
             expr, self.canonicalize(result, {}))
         return result
+
+    def unify(self, type_x, type_y):
+        print 'unify({0}, {1})'.format(type_x, type_y)
+        self.check_invariants()
+        # TODO: detect infinite types ("occurs check")
+        set_x = self.__type_sets.find(type_x)
+        set_y = self.__type_sets.find(type_y)
+        monotype_x = self.__inferred_types[set_x]
+        monotype_y = self.__inferred_types[set_y]
+        if monotype_x.application is None or monotype_y.application is None:
+            del self.__inferred_types[set_x]
+            del self.__inferred_types[set_y]
+            new_set = self.__type_sets.union(set_x, set_y)
+            if monotype_x.application is not None:
+                self.__inferred_types[new_set] = monotype_x
+            else:
+                # Covers the case where both x and y are free variables
+                self.__inferred_types[new_set] = monotype_y
+        else:
+            # Neither x nor y is a free variable.
+            if monotype_x.application[0] != monotype_y.application[0]:
+                assert False
+                raise Exception("Can't unify {0!r} with {1!r}".format(
+                        monotype_x.application[0], monotype_y.application[0]))
+            assert len(monotype_x.application) == len(monotype_y.application)
+            for i in xrange(1, len(monotype_x.application)):
+                self.unify(monotype_x.application[i],
+                           monotype_y.application[i])
+
+    def check_invariants(self):
+        all_sets = set(self.__type_sets.get_all_sets())
+        inferred_types_keys = set(self.__inferred_types.keys())
+        if all_sets != inferred_types_keys:
+            raise Exception(
+                'all sets are {0!r}, but inferred_types has keys {1!r}'.format(
+                    all_sets, inferred_types_keys))
 
 
 class TestTypeInference(unittest.TestCase):
@@ -311,6 +362,13 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             BoolLiteral(True),
             ('Bool',))
+
+    def test_const_application(self):
+        self.check_single_expr(
+            Application(
+                LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
+                BoolLiteral(True)),
+            ('->', 0, ('Bool',)))
 
 
 if __name__ == '__main__':

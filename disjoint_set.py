@@ -164,6 +164,12 @@ class DisjointSet(object):
             else:
                 assert 2 ** (self.__ranks[x] - 1) < n
 
+    def get_all_sets(self):
+        # TODO: test
+        for x in xrange(len(self.__parents)):
+            if self.__parents[x] == x:
+                yield x
+
 
 class TestDisjointSets(unittest.TestCase):
     def test_simple_union(self):
