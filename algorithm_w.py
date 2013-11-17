@@ -877,6 +877,20 @@ class TestTypeInference(unittest.TestCase):
             parse(r'maybe False (\x . True)'),
             ('->', ('Maybe', 0), ('Bool',)))
 
+    def test_boolean_example(self):
+        self.check_single_expr(
+            parse(r'\b . if b False True'),
+            ('->', ('Bool',), ('Bool',)))
+
+    def test_polymorphic_binding_example(self):
+        self.check_single_expr(
+            parse(r'let id = \x . x in mk_pair (id True) (id id)'),
+            ('Pair', ('Bool',), ('->', 0, 0)))
+
+    def test_monomorphic_binding_example(self):
+        self.check_type_error(
+            parse(r'(\id . mk_pair (id True) (id id)) (\x . x)'))
+
 
 if __name__ == '__main__':
     unittest.main()
