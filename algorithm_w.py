@@ -266,8 +266,7 @@ class TypeInferrer(object):
         for polytype in self.__env.itervalues():
             forall_vars = set()
             for v in polytype.bound_vars:
-                assert False
-                type_set = self.__type_sets.find(type_var)
+                type_set = self.__type_sets.find(v)
                 forall_vars.add(self.__type_sets.representative(type_set))
             free_vars.update(
                 self.find_free_vars_in_type(polytype.monotype_var) -
@@ -645,6 +644,29 @@ class TestTypeInference(unittest.TestCase):
                             Application(Variable('f'), Variable('y')))),
                     Application(Variable('g'), BoolLiteral(True)))),
             ('->', ('->', 0, 1), ('->', 0, 1)))
+
+    def test_nested_lets(self):
+        # When a let-expression appears inside a second
+        # let-expression, type variables appearing in the outer "let"
+        # are not re-generalized.  For example, in:
+        #
+        # (\x . let f = (\y . x) in let g = f True in g)
+        #
+        # if "x" has type "a", then "f" is assigned a type of "forall
+        # b . b -> a", and "g" is assigned a type of "a", *not*
+        # "forall a . a".  Therefore the whole expression has type (a
+        # -> a).
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                LetExpression(
+                    'f',
+                    LambdaAbstraction('y', Variable('x')),
+                    LetExpression(
+                        'g',
+                        Application(Variable('f'), BoolLiteral(True)),
+                        Variable('g')))),
+            ('->', 0, 0))
 
 
 if __name__ == '__main__':
