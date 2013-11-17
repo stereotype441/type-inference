@@ -229,7 +229,6 @@ class TypeInferrer(object):
                 else:
                     monotype = self.__inferred_types[type_set]
                     if monotype.application is None:
-                        assert False
                         return type_variable
                     else:
                         new_application = [monotype.application[0]]
@@ -435,6 +434,8 @@ class TypeInferrer(object):
                     all_sets, inferred_types_keys))
 
 
+# TODO: many of these tests would be far easier to read if I
+# implemented a parser for lambda expressions.
 class TestTypeInference(unittest.TestCase):
     def check_single_expr(self, expr, expected_type):
         ti = TypeInferrer()
@@ -560,6 +561,65 @@ class TestTypeInference(unittest.TestCase):
                         Variable('f'),
                         LambdaAbstraction('x', Variable('x'))),
                     Application(Variable('f'), BoolLiteral(True)))))
+
+    def test_let_partial_generalization_general_part(self):
+        # In some situations, "let" may generalize some of its type
+        # variables but not others.  For example, in:
+        #
+        # (\x . let const_x = (\y . x) in const_x (\z . const_x True))
+        #
+        # if the type of "x" is "a", then the type assigned to
+        # "const_x" by the "let" expression is "forall b . b -> a".
+        # Then, the first usage of "const_x" is specialized to type (c
+        # -> a) -> a, whereas the second is specialized to "Bool ->
+        # a", giving the final expression type "a -> a".  This would
+        # not work if the type assigned to "const_x" did not include
+        # "forall b".
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                LetExpression(
+                    'const_x',
+                    LambdaAbstraction('y', Variable('x')),
+                    Application(
+                        Variable('const_x'),
+                        LambdaAbstraction(
+                            'z',
+                            Application(
+                                Variable('const_x'),
+                                BoolLiteral(True)))))),
+            ('->', 0, 0))
+
+    def test_let_partial_generalization_non_general_part(self):
+        # In some situations, "let" may generalize some of its type
+        # variables but not others.  For example, in:
+        #
+        # (\x . let const_x = (\y . x) in const_x ((const_x (\z . z)) True))
+        #
+        # if the type of "x" is initially "a", then the type assigned
+        # to "const_x" by the "let" expression will initially be
+        # "forall b . b -> a".  Then, the first usage of "const_x"
+        # will be specialized to "c -> a", and the second will be
+        # specialized to "d -> (Bool -> e)".  Since there is no
+        # "forall a" in the type assigned to "const_x", "a" will be
+        # unified with "Bool -> e", so the resulting expression will
+        # have type "(Bool -> e) -> (Bool -> e)".  If a "forall a" had
+        # been present, then unification would not have occurred, and
+        # the type would have been "a -> a".
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                LetExpression(
+                    'const_x',
+                    LambdaAbstraction('y', Variable('x')),
+                    Application(
+                        Variable('const_x'),
+                        Application(
+                            Application(
+                                Variable('const_x'),
+                                LambdaAbstraction('z', Variable('z'))),
+                            BoolLiteral(True))))),
+            ('->', ('->', ('Bool',), 0), ('->', ('Bool',), 0)))
 
 
 if __name__ == '__main__':
