@@ -361,6 +361,9 @@ class TypeInferrer(object):
         """Unify the types represented by type_x and type_y."""
         set_x = self.__type_sets.find(type_x)
         set_y = self.__type_sets.find(type_y)
+        if set_x == set_y:
+            # Already unified
+            return
         monotype_x = self.__inferred_types[set_x]
         monotype_y = self.__inferred_types[set_y]
         if isinstance(monotype_x, MonotypeVar) or \
@@ -856,6 +859,14 @@ class TestTypeInference(unittest.TestCase):
                  ('->', 0, ('Bool',)),
                  ('->', ('Pair', ('Bool',), ('Bool',)), ('Bool',))),
                 ('->', 1, ('Bool',)))))))
+
+    def test_already_unified(self):
+        # Make sure that nothing goes wrong when unifying two types
+        # that are already the same.
+        self.check_single_expr(
+            self.def_utils(parse(r"\x . unify x x")),
+            ('->', 0, 0))
+
 
 if __name__ == '__main__':
     unittest.main()
