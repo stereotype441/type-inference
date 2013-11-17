@@ -155,6 +155,11 @@ class Polytype(object):
         self.monotype_var = monotype_var
 
 
+class TypeInferenceError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
+
 class TypeInferrer(object):
     def __init__(self):
         # Each element of __type_sets is a type variable introduced by
@@ -324,8 +329,7 @@ class TypeInferrer(object):
         else:
             # Neither x nor y is a free variable.
             if monotype_x.application[0] != monotype_y.application[0]:
-                assert False
-                raise Exception("Can't unify {0!r} with {1!r}".format(
+                raise TypeInferenceError("Can't unify {0!r} with {1!r}".format(
                         monotype_x.application[0], monotype_y.application[0]))
             assert len(monotype_x.application) == len(monotype_y.application)
             for i in xrange(1, len(monotype_x.application)):
@@ -350,7 +354,15 @@ class TestTypeInference(unittest.TestCase):
 
     def check_type_error(self, expr):
         ti = TypeInferrer()
-        self.assertRaises(Exception, ti.visit, expr)
+        # Note: self.assertRaises doesn't give a useful stack trace if
+        # there's an unexpected exception, so handroll the logic we
+        # want.
+        try:
+            ty = ti.visit(expr)
+        except TypeInferenceError:
+            return
+        self.fail('Expected a type inference error, got a type of {0!r}'.format(
+                ti.canonicalize(ty, {})))
 
     def test_identity(self):
         self.check_single_expr(
