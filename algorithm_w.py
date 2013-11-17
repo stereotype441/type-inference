@@ -358,7 +358,6 @@ class TypeInferrer(object):
 
     def unify(self, type_x, type_y):
         """Unify the types represented by type_x and type_y."""
-        self.check_invariants()
         set_x = self.__type_sets.find(type_x)
         set_y = self.__type_sets.find(type_y)
         monotype_x = self.__inferred_types[set_x]
@@ -423,6 +422,7 @@ class TestTypeInference(unittest.TestCase):
         ti = TypeInferrer()
         ty = ti.visit(expr)
         canonical_ty = ti.canonicalize(ty, {})
+        ti.check_invariants()
         self.assertEqual(canonical_ty, expected_type)
 
     def check_type_error(self, expr):
@@ -433,6 +433,7 @@ class TestTypeInference(unittest.TestCase):
         try:
             ty = ti.visit(expr)
         except TypeInferenceError:
+            ti.check_invariants()
             return
         self.fail('Expected a type inference error, got a type of {0!r}'.format(
                 ti.canonicalize(ty, {})))
