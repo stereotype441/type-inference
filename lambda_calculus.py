@@ -2,6 +2,7 @@
 # calculus.
 
 import abc
+import re
 
 
 class LambdaExpr(object):
@@ -130,3 +131,75 @@ class BoolLiteral(LambdaExpr):
         return '{0}'.format(self.value)
 
 
+class ParseError(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
+
+LEXING_REGEXP = re.compile(r'[A-Za-z_][A-Za-z_0-9]*|[()=\\.]')
+RESERVED_WORDS = ('let', 'in', '(', ')', '=', '\\', '.')
+
+
+def parse(s):
+    """Parse the given S-expression into a lambda calculus AST."""
+    # TODO: throw an exception if valid tokens are separated by
+    # non-whitespace.
+    tokens = LEXING_REGEXP.findall(s)
+
+    def peek():
+        if len(tokens) == 0:
+            return None
+        else:
+            return tokens[0]
+
+    def advance():
+        return tokens.pop(0)
+
+    def expect(s):
+        if peek() != s:
+            raise ParseError('Expected {0!r}, got {1!r}'.format(s, peek()))
+        return advance()
+
+    def expect_identifier():
+        token = advance()
+        if token in RESERVED_WORDS:
+            raise ParseError('Expected identifier, got {0!r}'.format(token))
+        return token
+
+    def consume_expression(precedence):
+        if peek() == '(':
+            advance()
+            e1 = consume_expression(0)
+            expect(')')
+        elif peek() == '\\':
+            advance()
+            var = expect_identifier()
+            expect('.')
+            subexpr = consume_expression(0)
+            return LambdaAbstraction(var, subexpr)
+        elif peek() == 'let':
+            advance()
+            var = expect_identifier()
+            expect('=')
+            e1 = consume_expression(0)
+            expect('in')
+            e2 = consume_expression(0)
+            return LetExpression(var, e1, e2)
+        else:
+            var = expect_identifier()
+            if var == 'True':
+                e1 = BoolLiteral(True)
+            elif var == 'False':
+                e1 = BoolLiteral(False)
+            else:
+                e1 = Variable(var)
+        if precedence < 1:
+            while peek() not in (')', 'in', None):
+                e2 = consume_expression(1)
+                e1 = Application(e1, e2)
+        return e1
+
+    result = consume_expression(0)
+    if peek() is not None:
+        raise ParseError('Expected END, got {0!r}'.format(peek()))
+    return result
