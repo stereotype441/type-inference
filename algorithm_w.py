@@ -384,23 +384,6 @@ class TypeInferrer(object):
                 raise TypeInferenceError(
                     "Unifying {0!r} would create infinite type".format(
                         monotype_y))
-            # Unioning set_x and set_y invalidates them and produces a
-            # new object to represent the set.  So remove the set_x
-            # and set_y keys from __inferred_types, and add the new
-            # inferred type after unioning.
-            del self.__inferred_types[set_x]
-            del self.__inferred_types[set_y]
-            new_set = self.__type_sets.union(set_x, set_y)
-            # If either x or y maps to a MonotypeApp (note: it can't
-            # be both; that's handled in the "else" clause below),
-            # then that MonotypeApp needs to be stored in
-            # self.__inferred_types.  Otherwise they both map to a
-            # MonotypeVar, so it doesn't matter which one we store in
-            # self.__inferred_types.
-            if isinstance(monotype_x, MonotypeApp):
-                self.__inferred_types[new_set] = monotype_x
-            else:
-                self.__inferred_types[new_set] = monotype_y
         else:
             # Both x and y represent MonotypeApps, so we need to match
             # the type constructors and then unify each of the type
@@ -411,6 +394,28 @@ class TypeInferrer(object):
             assert len(monotype_x.args) == len(monotype_y.args)
             for i in xrange(0, len(monotype_x.args)):
                 self.unify(monotype_x.args[i], monotype_y.args[i])
+            # Now that we've unified the contents of the MonotypeApps,
+            # continue on to union set_x and set_y.  There's no harm,
+            # and it may help shortcut future unify() operations.
+
+        # Unioning set_x and set_y invalidates them and produces a new
+        # object to represent the set.  So remove the set_x and set_y
+        # keys from __inferred_types, and add the new inferred type
+        # after unioning.
+        del self.__inferred_types[set_x]
+        del self.__inferred_types[set_y]
+        new_set = self.__type_sets.union(set_x, set_y)
+        # If either x or y maps to a MonotypeApp, then that
+        # MonotypeApp needs to be stored in self.__inferred_types.  If
+        # both of them map to a MonotypeApp, that's fine; thanks to
+        # the recursive calls to unify() above, they are the same, so
+        # we can just pick one.  If they both map to a MonotypeVar, it
+        # doesn't matter which one we pick because MonotypeVar doesn't
+        # store any additional information.
+        if isinstance(monotype_x, MonotypeApp):
+            self.__inferred_types[new_set] = monotype_x
+        else:
+            self.__inferred_types[new_set] = monotype_y
 
     def check_invariants(self):
         """For debugging and unit testing: check data structure
