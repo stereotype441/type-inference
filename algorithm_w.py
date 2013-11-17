@@ -550,34 +550,44 @@ class TestTypeInference(unittest.TestCase):
         # unifications are:
         #
         # let ignore = \x . True
-        # let ignore2 = \x . \y . True
-        # let second = \x . \y . y
-        # let unify = \x . \y . second (\z . ignore2 (z x) (z y)) x
         #
         # "ignore" has type "a -> Bool"; it ignores its argument and
-        # returns a boolean.  "ignore2" has type "a -> b -> Bool"; it
-        # ignores two arguments and returns a boolean.  "second" has
-        # type "a -> b -> b"; it ignores its first argument and
-        # returns its second.  "unify" has type "a -> a -> Bool"; it
+        # returns a boolean.
+        #
+        # let ignore2 = \x . \y . True
+        #
+        # "ignore2" has type "a -> b -> Bool"; it ignores two
+        # arguments and returns a boolean.
+        #
+        # let second = \x . \y . y
+        #
+        # "second" has type "a -> b -> b"; it ignores its first
+        # argument and returns its second.
+        #
+        # let unify = \x . \y . second (\z . ignore2 (z x) (z y)) x
+        #
+        # "unify" has type "a -> a -> Bool"; it
         # forces its two arguments to have the same type, and returns
         # the first argument.
+        #
+        # let mk_fn = \x . \y . \z . second (unify x z) y
+        #
+        # "mk_fn" has type "a -> b -> (a -> b)"; given arguments of
+        # types "a" and "b", it returns a function of type "a -> b".
         #
         # This function wraps the given subexpressions in the
         # necessary "let" constructs so that it can refer to "ignore",
         # "ignore2", and "unify".
-        return LetExpression(
-            'ignore',
-            parse(r'\x . True'),
-            LetExpression(
-                'ignore2',
-                parse(r'\x . \y . True'),
-                LetExpression(
-                    'second',
-                    parse(r'\x . \y . y'),
-                    LetExpression(
-                        'unify',
-                        parse(r'\x . \y . second (\z . ignore2 (z x) (z y)) x'),
-                        subexpr))))
+        fns = [
+            ('ignore', parse(r'\x . True')),
+            ('ignore2', parse(r'\x . \y . True')),
+            ('second', parse(r'\x . \y . y')),
+            ('unify', parse(r'\x . \y . second (\z . ignore2 (z x) (z y)) x')),
+            ('mk_fn', parse(r'\x . \y . \z . second (unify x z) y'))
+            ]
+        for name, defn in reversed(fns):
+            subexpr = LetExpression(name, defn, subexpr)
+        return subexpr
 
     def test_ignore_func(self):
         # Check the type of the "ignore" function defined in
@@ -606,6 +616,13 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             self.def_utils(parse('unify')),
             ('->', 0, ('->', 0, 0)))
+
+    def test_mk_fn_func(self):
+        # Check the type of the "mk_fn" function defined in
+        # def_utils().
+        self.check_single_expr(
+            self.def_utils(parse('mk_fn')),
+            ('->', 0, ('->', 1, ('->', 0, 1))))
 
     def test_mutually_recursive_type(self):
         # A more complex example of an infinite type, involving the
