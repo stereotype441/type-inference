@@ -342,9 +342,10 @@ class TypeInferrer(object):
         return result
 
     def occurs_in(self, type_set, monotype_app):
-        # Determine whether a type variable in the set "type_set"
-        # appears anywhere in "monotype_app".  This is used to avoid
-        # creating infinite types.
+        """Determine whether a type variable in the set "type_set"
+        appears anywhere in "monotype_app".  This is used to avoid
+        creating infinite types.
+        """
         for arg in monotype_app.args:
             arg_set = self.__type_sets.find(arg)
             if arg_set == type_set:
@@ -356,6 +357,7 @@ class TypeInferrer(object):
         return False
 
     def unify(self, type_x, type_y):
+        """Unify the types represented by type_x and type_y."""
         self.check_invariants()
         set_x = self.__type_sets.find(type_x)
         set_y = self.__type_sets.find(type_y)
@@ -374,16 +376,27 @@ class TypeInferrer(object):
                 raise TypeInferenceError(
                     "Unifying {0!r} would create infinite type".format(
                         monotype_y))
+            # Unioning set_x and set_y invalidates them and produces a
+            # new object to represent the set.  So remove the set_x
+            # and set_y keys from __inferred_types, and add the new
+            # inferred type after unioning.
             del self.__inferred_types[set_x]
             del self.__inferred_types[set_y]
             new_set = self.__type_sets.union(set_x, set_y)
+            # If either x or y maps to a MonotypeApp (note: it can't
+            # be both; that's handled in the "else" clause below),
+            # then that MonotypeApp needs to be stored in
+            # self.__inferred_types.  Otherwise they both map to a
+            # MonotypeVar, so it doesn't matter which one we store in
+            # self.__inferred_types.
             if isinstance(monotype_x, MonotypeApp):
                 self.__inferred_types[new_set] = monotype_x
             else:
-                # Covers the case where both x and y are free variables
                 self.__inferred_types[new_set] = monotype_y
         else:
-            # Neither x nor y is a free variable.
+            # Both x and y represent MonotypeApps, so we need to match
+            # the type constructors and then unify each of the type
+            # arguments.
             if monotype_x.constructor != monotype_y.constructor:
                 raise TypeInferenceError("Can't unify {0!r} with {1!r}".format(
                         monotype_x, monotype_y))
@@ -392,6 +405,11 @@ class TypeInferrer(object):
                 self.unify(monotype_x.args[i], monotype_y.args[i])
 
     def check_invariants(self):
+        """For debugging and unit testing: check data structure
+        invariants.
+        """
+        # Check that each set in self.__type_sets corresponds to a key
+        # in self.__inferred_types.
         all_sets = set(self.__type_sets.get_all_sets())
         inferred_types_keys = set(self.__inferred_types.keys())
         if all_sets != inferred_types_keys:
