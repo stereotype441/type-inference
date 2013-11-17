@@ -1,10 +1,3 @@
-# An implementation of Hindley-Milner type inference in Python, as an
-# exercise to improve my understanding of type inference algorithms.
-#
-# Based on http://en.wikipedia.org/wiki/Hindley%E2%80%93Milner.
-#
-# Tested with Python 2.7.
-
 import disjoint_set
 from lambda_calculus import (
     Variable, LetExpression, LambdaAbstraction, Application, parse)

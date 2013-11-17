@@ -1,0 +1,76 @@
+This project is an implementation of Hindley-Milner type inference in
+Python, as an exercise to improve my understanding of type inference
+algorithms.  The language which is type-checked is the typed lambda
+calculus.
+
+Based on http://en.wikipedia.org/wiki/Hindley%E2%80%93Milner.
+
+Tested with Python 2.7.
+
+
+Usage:
+-----
+
+To type check a lambda expression, invoke "pyton main.py
+<expression>".  For example:
+
+    $ python main.py '\x . \y . x'
+    Expression:
+
+    \x . \y . x
+
+    has type:
+
+    t0 -> t1 -> t0
+
+
+To see a full list of built-in symbols, invoke:
+
+    $ python main.py
+
+
+Supported features:
+------------------
+
+- Boolean types, for example:
+
+  \b . if b False True :: Bool -> Bool
+
+- Haskell's "Maybe" type, for example:
+
+  maybe False (\x . True) :: Maybe a -> Bool
+
+- Pair types, for example:
+
+  \b . if b fst snd :: Bool -> (a, a) -> a
+
+- "Let" bindings are polymorphic, for example:
+
+  let id = \x . x in mk_pair (id True) (id id) :: (Bool, a -> a)
+
+  (each instantiation of "id" is specialized to a different type).
+
+- Lambda bindings are monomorphic, for example:
+
+  (\id . mk_pair (id True) (id id)) (\x . x) :: ERROR
+
+  (no single consistent type can be assigned to "id").
+
+- Infinite types are prohibited, for example:
+
+  (\f . f f) :: ERROR
+
+
+Source files:
+------------
+
+- algorithm_w.py: the type inference algorithm itself.
+
+- disjoint_set.py: the data structure that is used to keep track of
+  which types have been unified.
+
+- lambda_calculus.py: abstract syntax tree for the source language,
+  with parsing and pretty-printing capabilities.
+
+- main.py: interface to allow a type to be checked from the command
+  line.
