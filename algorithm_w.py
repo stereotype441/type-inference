@@ -874,6 +874,28 @@ class TestTypeInference(unittest.TestCase):
                             LambdaAbstraction('x', Variable('f'))),
                         Variable('f')))))
 
+    def test_s_combinator(self):
+        # Check the type of the "S" combinator:
+        #
+        # (\x . \y . \z . x z (y z))
+        #
+        # It sould have type:
+        #
+        # (a -> b -> c) -> (a -> b) -> a -> c
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                LambdaAbstraction(
+                    'y',
+                    LambdaAbstraction(
+                        'z',
+                        Application(
+                            Application(Variable('x'), Variable('z')),
+                            Application(Variable('y'), Variable('z')))))),
+            ('->',
+             ('->', 0, ('->', 1, 2)),
+             ('->', ('->', 0, 1), ('->', 0, 2))))
+
 
 if __name__ == '__main__':
     unittest.main()
