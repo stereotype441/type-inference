@@ -35,4 +35,4 @@ print """Expression:
 has type:
 
 {1!r}
-""".format(expr, canonical_ty)
+""".format(expr, algorithm_w.pretty_print_canonical_type(canonical_ty))

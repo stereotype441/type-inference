@@ -417,6 +417,39 @@ class TypeInferrer(object):
                     all_sets, inferred_types_keys))
 
 
+def pretty_print_canonical_type(ty, precedence = 0):
+    """Pretty print a return value from TypeInferrer.canonicalize().
+
+    Precedence is as follows:
+    0: only parenthesize pairs.
+    1: parenthesize functions and pairs.
+    2: parenthesize functions, pairs, and type applications.
+    """
+    if isinstance(ty, int):
+        parens_needed = False
+        result = 't{0}'.format(ty)
+    elif ty[0] == '->':
+        parens_needed = precedence >= 1
+        result = '{0} -> {1}'.format(
+            pretty_print_canonical_type(ty[1], 1),
+            pretty_print_canonical_type(ty[2], 0))
+    elif ty[0] == 'Pair':
+        parens_needed = True
+        result = '{0}, {1}'.format(
+            pretty_print_canonical_type(ty[1], 0),
+            pretty_print_canonical_type(ty[2], 0))
+    else:
+        terms = [ty[0]]
+        for i in xrange(1, len(ty)):
+            terms.append(pretty_print_canonical_type(ty[i], 2))
+        result = ' '.join(terms)
+        parens_needed = len(terms) > 1 and precedence >= 2
+    if parens_needed:
+        return '({0})'.format(result)
+    else:
+        return result
+
+
 class TestTypeInference(unittest.TestCase):
     def check_single_expr(self, expr, expected_type):
         ti = TypeInferrer()
