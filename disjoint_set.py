@@ -55,6 +55,7 @@ class DisjointSet(object):
     we use the root element with the higher rank as the new root.
     This keeps the maximum depth of the trees adequately bounded.
     """
+    element_type = int
 
     def __init__(self):
         """Create a DisjointSet containing no elements."""
