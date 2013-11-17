@@ -137,14 +137,44 @@ class ParseError(Exception):
 
 
 LEXING_REGEXP = re.compile(r'[A-Za-z_][A-Za-z_0-9]*|[()=\\.]')
+NON_WHITESPACE_REGEXP = re.compile(r'\S')
 RESERVED_WORDS = ('let', 'in', '(', ')', '=', '\\', '.')
 
 
 def parse(s):
-    """Parse the given S-expression into a lambda calculus AST."""
-    # TODO: throw an exception if valid tokens are separated by
-    # non-whitespace.
-    tokens = LEXING_REGEXP.findall(s)
+    """Quick and dirty recursive descent parser to transform a string
+    into a lambda calculus AST.  The grammar is as follows:
+
+    expression: '(' expression ')' |
+                '\\' identifier '.' expression |
+                'let' identifier '=' expression 'in' expression |
+                expression expression |
+                identifier
+
+    Ambiguities are resolved as follows:
+
+    - Application associates to the left.  So "a b c" is parsed as "(a
+      b) c".
+
+    - The expressions appearing at the end of a lambda abstraction or
+      a "let" expression are considered to extend as far to the right
+      as possible.  So "\\x . y z" is parsed as "\\x . (y z)", not
+      "(\\x . y) z".  Similarly, "let x = y in z w" is parsed as "let
+      x = y in (z w)".
+    """
+    # Lex the input string into tokens.
+    tokens = []
+    pos = 0
+    while pos < len(s):
+        match = NON_WHITESPACE_REGEXP.search(s, pos)
+        if match is None:
+            break
+        pos = match.start()
+        match = LEXING_REGEXP.match(s, pos)
+        if match is None:
+            raise ParseError('Unexpected input character {0!r}'.format(s[pos]))
+        tokens.append(match.group())
+        pos = match.end()
 
     def peek():
         if len(tokens) == 0:
@@ -167,6 +197,12 @@ def parse(s):
         return token
 
     def consume_expression(precedence):
+        """Consume an expression in the lambda grammar.  Precedence is
+        as follows:
+
+        0: consume as many tokens as possible.
+        1: do not consume the RHS of an application.
+        """
         if peek() == '(':
             advance()
             e1 = consume_expression(0)
