@@ -61,12 +61,14 @@ class TypeInferrer(object):
         # Create built-in types
         self.__bool_ty = self.new_type_application('Bool')
 
-    def new_type_var(self):
-        """Produce a new type variable with no meaning assigned to it
-        yet.
+    def new_type_var(self, monotype):
+        """Produce a new type variable whose meaning is the given
+        monotype.
         """
-        # TODO: refactor the call to Monotype() into this function.
-        return self.__type_sets.add_elem()
+        type_var = self.__type_sets.add_elem()
+        type_set = self.__type_sets.find(type_var)
+        self.__inferred_types[type_set] = monotype
+        return type_var
 
     def new_type_application(self, type_constructor, *args):
         """Produce a new type variable representing an instantiation
@@ -75,10 +77,8 @@ class TypeInferrer(object):
         The type constructor should be a string; the arguments should
         be type variables.
         """
-        type_var = self.new_type_var()
-        self.__inferred_types[type_var] = Monotype(
-            (type_constructor,) + tuple(args))
-        return type_var
+        return self.new_type_var(Monotype(
+                (type_constructor,) + tuple(args)))
 
     def new_fn_type(self, x, y):
         """Produce a new type variable representing a function which
@@ -96,8 +96,7 @@ class TypeInferrer(object):
             assignments = {}
             for v in polytype.bound_vars:
                 v_set = self.__type_sets.find(v)
-                assignments[v_set] = self.new_type_var()
-                self.__inferred_types[assignments[v_set]] = Monotype()
+                assignments[v_set] = self.new_type_var(Monotype())
             def specialize_part(type_variable):
                 type_set = self.__type_sets.find(type_variable)
                 if type_set in assignments:
@@ -118,10 +117,8 @@ class TypeInferrer(object):
                         else:
                             # Create a new type variable to represent
                             # the substituted monotype.
-                            new_type = self.new_type_var()
-                            self.__inferred_types[new_type] = Monotype(
-                                new_application)
-                            return new_type
+                            return self.new_type_var(Monotype(
+                                    new_application))
             return specialize_part(polytype.monotype_var)
 
     def find_free_vars_in_type(self, type_var):
@@ -213,9 +210,7 @@ class TypeInferrer(object):
             assert isinstance(result, int)
         elif isinstance(expr, LambdaAbstraction):
             # Generate a new monotype to represent the bound variable.
-            type_var = self.new_type_var()
-            monotype = Monotype()
-            self.__inferred_types[type_var] = monotype
+            type_var = self.new_type_var(Monotype())
 
             # Generate a new polytype to store in the environment.
             polytype = Polytype(frozenset(), type_var)
@@ -240,9 +235,7 @@ class TypeInferrer(object):
 
             # Create a new type variable to represent the result of
             # the function application.
-            result = self.new_type_var()
-            monotype = Monotype()
-            self.__inferred_types[result] = monotype
+            result = self.new_type_var(Monotype())
 
             # Figure out what the type of "f" must be given the type
             # of "x" and the result type.
