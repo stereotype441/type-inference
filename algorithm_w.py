@@ -667,6 +667,18 @@ class TestTypeInference(unittest.TestCase):
             parse('mk_pair'),
             ('->', 0, ('->', 1, ('Pair', 0, 1))))
 
+    def test_curry(self):
+        # Check the type of the curry function
+        self.check_single_expr(
+            parse(r'\f . \x . \y . f (mk_pair x y)'),
+            ('->', ('->', ('Pair', 0, 1), 2), ('->', 0, ('->', 1, 2))))
+
+    def test_uncurry(self):
+        # Check the type of the uncurry function
+        self.check_single_expr(
+            parse(r'\f . \p . f (fst p) (snd p)'),
+            ('->', ('->', 0, ('->', 1, 2)), ('->', ('Pair', 0, 1), 2)))
+
 
 if __name__ == '__main__':
     unittest.main()
