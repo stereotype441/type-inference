@@ -170,6 +170,10 @@ class DisjointSet(object):
             if self.__parents[x] == x:
                 yield x
 
+    def representative(self, x):
+        # TODO: test
+        return x
+
 
 class TestDisjointSets(unittest.TestCase):
     def test_simple_union(self):

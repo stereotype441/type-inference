@@ -114,13 +114,11 @@ class LambdaAbstraction(LambdaExpr):
 class LetExpression(LambdaExpr):
     """Lambda calculus representation of a let expression."""
     def __init__(self, var, e1, e2):
-        assert False
         self.var = var
         self.e1 = e1
         self.e2 = e2
 
     def _pretty(self, precedence):
-        assert False
         return self._paren_if(
             precedence >= 1,
             'let {0} = {1} in {2}'.format(self.var,
@@ -140,6 +138,8 @@ class BoolLiteral(LambdaExpr):
 
 class Monotype(object):
     def __init__(self, application = None):
+        # TODO: "application" isn't a helpful name.
+        # TODO: don't use a simple tuple for self.application.
         self.application = application
 
     def __repr__(self):
@@ -153,6 +153,10 @@ class Polytype(object):
     def __init__(self, bound_vars, monotype_var):
         self.bound_vars = bound_vars
         self.monotype_var = monotype_var
+
+    def __repr__(self):
+        return 'Polytype({0!r}, {1!r})'.format(self.bound_vars,
+                                               self.monotype_var)
 
 
 class TypeInferenceError(Exception):
@@ -213,8 +217,56 @@ class TypeInferrer(object):
         if len(polytype.bound_vars) == 0:
             return polytype.monotype_var
         else:
-            assert False
-            raise NotImplementedError() # TODO
+            assignments = {}
+            for v in polytype.bound_vars:
+                v_set = self.__type_sets.find(v)
+                assignments[v_set] = self.new_type_var()
+                self.__inferred_types[assignments[v_set]] = Monotype()
+            def specialize_part(type_variable):
+                type_set = self.__type_sets.find(type_variable)
+                if type_set in assignments:
+                    return assignments[type_set]
+                else:
+                    monotype = self.__inferred_types[type_set]
+                    if monotype.application is None:
+                        assert False
+                        return type_variable
+                    else:
+                        new_application = [monotype.application[0]]
+                        for i in xrange(1, len(monotype.application)):
+                            new_application.append(
+                                specialize_part(monotype.application[i]))
+                        new_application = tuple(new_application)
+                        if (new_application == monotype.application):
+                            assert False
+                            # No changes were made, so re-use the old type.
+                            return type_variable
+                        else:
+                            # Create a new type variable to represent
+                            # the substituted monotype.
+                            new_type = self.new_type_var()
+                            self.__inferred_types[new_type] = Monotype(
+                                new_application)
+                            return new_type
+            return specialize_part(polytype.monotype_var)
+
+    def generalize(self, type_var):
+        """Generalize a type variable into a polytype, by quantifying
+        all free variables with "forall".
+        """
+        # TODO: this algorithm is wrong--it erroneously marks
+        # variables as free even if they are bound in the environment.
+        free_vars = set()
+        def find_free_vars(type_var):
+            type_set = self.__type_sets.find(type_var)
+            monotype = self.__inferred_types[type_set]
+            if monotype.application is None:
+                free_vars.add(self.__type_sets.representative(type_set))
+            else:
+                for i in xrange(1, len(monotype.application)):
+                    find_free_vars(monotype.application[i])
+        find_free_vars(type_var)
+        return Polytype(frozenset(free_vars), type_var)
 
     def canonicalize(self, type_var, types_seen):
         """Convert a type variable into a string representing the type
@@ -270,6 +322,7 @@ class TypeInferrer(object):
             # Look up the type bound to the variable name; if it was
             # introduced by a let expression we need to specialize it.
             result = self.specialize(self.__env[expr.name])
+            assert isinstance(result, int)
         elif isinstance(expr, LambdaAbstraction):
             # Generate a new monotype to represent the bound variable.
             type_var = self.new_type_var()
@@ -277,8 +330,7 @@ class TypeInferrer(object):
             self.__inferred_types[type_var] = monotype
 
             # Generate a new polytype to store in the environment.
-            # TODO: should polytype.bound_vars be a list or a tuple?
-            polytype = Polytype([], type_var)
+            polytype = Polytype(frozenset(), type_var)
 
             # Visit the subexpression and allow it to refine the type
             # of the bound variable.
@@ -288,8 +340,10 @@ class TypeInferrer(object):
             # The inferred type of the resulting abstraction is
             # (var_type -> subexpr_type).
             result = self.new_fn_type(type_var, subexpr_type)
+            assert isinstance(result, int)
         elif isinstance(expr, BoolLiteral):
             result = self.__bool_ty
+            assert isinstance(result, int)
         elif isinstance(expr, Application):
             # First infer the types of the LHS ("f") and RHS ("x") of
             # the application.
@@ -309,6 +363,20 @@ class TypeInferrer(object):
             # Unify that with the type that we've already inferred for
             # f.
             self.unify(f_type, f_type_to_unify)
+            assert isinstance(result, int)
+        elif isinstance(expr, LetExpression):
+            # Infer the type of the expression to be bound.
+            e1_type = self.visit(expr.e1)
+
+            # Generate a new monotype to represent the bound variable.
+            polytype = self.generalize(e1_type)
+            print polytype
+            print self.__inferred_types
+
+            # Visit the second expression and allow it to use the
+            # bound variable.
+            result = self.visit_with_binding(expr.var, polytype, expr.e2)
+            assert isinstance(result, int)
         else:
             assert False
         print 'Assigned {0} a type of {1}'.format(
@@ -394,6 +462,14 @@ class TestTypeInference(unittest.TestCase):
 
     def test_bad_application(self):
         self.check_type_error(Application(BoolLiteral(True), BoolLiteral(False)))
+
+    def test_simple_let(self):
+        self.check_single_expr(
+            LetExpression(
+                'const',
+                LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
+                Application(Variable('const'), BoolLiteral(True))),
+            ('->', 0, ('Bool',)))
 
 
 if __name__ == '__main__':
