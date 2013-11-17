@@ -406,7 +406,6 @@ class TypeInferrer(object):
             monotype_i = self.__inferred_types[set_i]
             if monotype_i.application is not None and \
                     self.occurs_in(type_set, monotype_i.application):
-                assert False
                 return True
         return False
 
@@ -748,6 +747,103 @@ class TestTypeInference(unittest.TestCase):
         # don't permit.
         self.check_type_error(
             LambdaAbstraction('f', Application(Variable('f'), Variable('f'))))
+
+    def def_utils(self, subexpr):
+        # Some useful utility functions for testing complex
+        # unifications are:
+        #
+        # let ignore = \x . True
+        # let ignore2 = \x . \y . True
+        # let unify = \x . \y . ignore (\z . ignore2 (z x) (z y))
+        #
+        # "ignore" has type "a -> Bool"; it ignores its argument and
+        # returns a boolean.  "ignore2" has type "a -> b -> Bool"; it
+        # ignores two arguments and returns a boolean.  "unify" has
+        # type "a -> a -> Bool"; it forces its two arguments to have
+        # the same type, ignores them, and returns a boolean.
+        #
+        # This function wraps the given subexpressions in the
+        # necessary "let" constructs so that it can refer to "ignore",
+        # "ignore2", and "unify".
+        return LetExpression(
+            'ignore',
+            LambdaAbstraction('x', BoolLiteral(True)),
+            LetExpression(
+                'ignore2',
+                LambdaAbstraction(
+                    'x',
+                    LambdaAbstraction('y', BoolLiteral(True))),
+                LetExpression(
+                    'unify',
+                    LambdaAbstraction(
+                        'x',
+                        LambdaAbstraction(
+                            'y',
+                            Application(
+                                Variable('ignore'),
+                                LambdaAbstraction(
+                                    'z',
+                                    Application(
+                                        Application(
+                                            Variable('ignore2'),
+                                            Application(
+                                                Variable('z'),
+                                                Variable('x'))),
+                                        Application(
+                                            Variable('z'),
+                                            Variable('y'))))))),
+                    subexpr)))
+
+    def test_ignore_func(self):
+        # Check the type of the "ignore" function defined in
+        # def_utils().
+        self.check_single_expr(
+            self.def_utils(Variable('ignore')),
+            ('->', 0, ('Bool',)))
+
+    def test_ignore2_func(self):
+        # Check the type of the "ignore2" function defined in
+        # def_utils().
+        self.check_single_expr(
+            self.def_utils(Variable('ignore2')),
+            ('->', 0, ('->', 1, ('Bool',))))
+
+    def test_unify_func(self):
+        # Check the type of the "unify" function defined in
+        # def_utils().
+        self.check_single_expr(
+            self.def_utils(Variable('unify')),
+            ('->', 0, ('->', 0, ('Bool',))))
+
+    def test_mutually_recursive_type(self):
+        # A more complex example of an infinite type, involving the
+        # mutual recursion of two types, is the expression:
+        #
+        # (\f . \g . ignore2 (unify f (\x . g)) (unify g (\x . f)))
+        #
+        # (where "unify" and "ignore2" are defined in def_utils()).
+        #
+        # If "f" has type "a" and "g" has type "b", this expression
+        # forces "a" to be unified with "c -> b" and forces "b" to be
+        # unified with "d -> a", resulting in a mutual recursion of
+        # two types; which produces an infinite type.
+        self.check_type_error(
+            self.def_utils(
+                LambdaAbstraction(
+                    'f',
+                    LambdaAbstraction(
+                        'g',
+                        Application(
+                            Application(
+                                Variable('ignore2'),
+                                Application(
+                                    Application(
+                                        Variable('unify'),
+                                        Variable('f')),
+                                    LambdaAbstraction('x', Variable('g')))),
+                            Application(
+                                Application(Variable('unify'), Variable('g')),
+                                LambdaAbstraction('x', Variable('f'))))))))
 
 
 if __name__ == '__main__':
