@@ -348,6 +348,10 @@ class TestTypeInference(unittest.TestCase):
         canonical_ty = ti.canonicalize(ty, {})
         self.assertEqual(canonical_ty, expected_type)
 
+    def check_type_error(self, expr):
+        ti = TypeInferrer()
+        self.assertRaises(Exception, ti.visit, expr)
+
     def test_identity(self):
         self.check_single_expr(
             LambdaAbstraction('x', Variable('x')),
@@ -369,6 +373,9 @@ class TestTypeInference(unittest.TestCase):
                 LambdaAbstraction('x', LambdaAbstraction('y', Variable('x'))),
                 BoolLiteral(True)),
             ('->', 0, ('Bool',)))
+
+    def test_bad_application(self):
+        self.check_type_error(Application(BoolLiteral(True), BoolLiteral(False)))
 
 
 if __name__ == '__main__':
