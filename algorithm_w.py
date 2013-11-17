@@ -13,16 +13,35 @@ import unittest
 
 
 class Monotype(object):
-    def __init__(self, application = None):
-        # TODO: "application" isn't a helpful name.
-        # TODO: don't use a simple tuple for self.application.
-        self.application = application
+    """Base class representing a "monotype" (a type in which all free
+    variables are subject to type inference, and may in the future be
+    unified with other type variables).
+    """
+    pass
+
+
+class MonotypeVar(Monotype):
+    """Monotype representing a single type variable."""
+    def __repr__(self):
+        return 'MonotypeVar()'
+
+
+class MonotypeApp(Monotype):
+    """Monotype representing a type constructor applied to zero or
+    more type arguments.
+
+    The type arguments are represented by "elements" of a DisjointSet
+    object.
+    """
+    def __init__(self, constructor, *args):
+        for arg in args:
+            assert isinstance(arg, disjoint_set.DisjointSet.element_type)
+        self.constructor = constructor
+        self.args = args
 
     def __repr__(self):
-        if self.application is None:
-            return 'Monotype()'
-        else:
-            return 'Monotype({0!r})'.format(self.application)
+        return 'MonotypeApp({0})'.format(
+            ', '.join(repr(x) for x in (self.constructor,) + self.args))
 
 
 class Polytype(object):
@@ -62,8 +81,8 @@ class TypeInferrer(object):
         self.__bool_ty = self.new_type_application('Bool')
 
         # Pre-load the environment with some built-in functions
-        a = self.new_type_var(Monotype())
-        b = self.new_type_var(Monotype())
+        a = self.new_type_var(MonotypeVar())
+        b = self.new_type_var(MonotypeVar())
         self.__env['mk_pair'] = self.generalize(
             self.new_fn_type(
                 a,
@@ -89,8 +108,7 @@ class TypeInferrer(object):
         The type constructor should be a string; the arguments should
         be type variables.
         """
-        return self.new_type_var(Monotype(
-                (type_constructor,) + tuple(args)))
+        return self.new_type_var(MonotypeApp(type_constructor,*args))
 
     def new_fn_type(self, x, y):
         """Produce a new type variable representing a function which
@@ -108,29 +126,26 @@ class TypeInferrer(object):
             assignments = {}
             for v in polytype.bound_vars:
                 v_set = self.__type_sets.find(v)
-                assignments[v_set] = self.new_type_var(Monotype())
+                assignments[v_set] = self.new_type_var(MonotypeVar())
             def specialize_part(type_variable):
                 type_set = self.__type_sets.find(type_variable)
                 if type_set in assignments:
                     return assignments[type_set]
                 else:
                     monotype = self.__inferred_types[type_set]
-                    if monotype.application is None:
+                    if isinstance(monotype, MonotypeVar):
                         return type_variable
                     else:
-                        new_application = [monotype.application[0]]
-                        for i in xrange(1, len(monotype.application)):
-                            new_application.append(
-                                specialize_part(monotype.application[i]))
-                        new_application = tuple(new_application)
-                        if (new_application == monotype.application):
+                        new_args = tuple(specialize_part(arg)
+                                         for arg in monotype.args)
+                        if (new_args == monotype.args):
                             # No changes were made, so re-use the old type.
                             return type_variable
                         else:
                             # Create a new type variable to represent
                             # the substituted monotype.
-                            return self.new_type_var(Monotype(
-                                    new_application))
+                            return self.new_type_var(MonotypeApp(
+                                    monotype.constructor, *new_args))
             return specialize_part(polytype.monotype_var)
 
     def find_free_vars_in_type(self, type_var):
@@ -138,11 +153,11 @@ class TypeInferrer(object):
         def recurse(type_var):
             type_set = self.__type_sets.find(type_var)
             monotype = self.__inferred_types[type_set]
-            if monotype.application is None:
+            if isinstance(monotype, MonotypeVar):
                 free_vars.add(self.__type_sets.representative(type_set))
             else:
-                for i in xrange(1, len(monotype.application)):
-                    recurse(monotype.application[i])
+                for arg in monotype.args:
+                    recurse(arg)
         recurse(type_var)
         return frozenset(free_vars)
 
@@ -186,11 +201,10 @@ class TypeInferrer(object):
         """
         type_var = self.__type_sets.find(type_var)
         monotype = self.__inferred_types[type_var]
-        if monotype.application is not None:
-            result = [monotype.application[0]]
-            for i in xrange(1, len(monotype.application)):
-                result.append(self.canonicalize(monotype.application[i],
-                                                types_seen))
+        if isinstance(monotype, MonotypeApp):
+            result = [monotype.constructor]
+            for arg in monotype.args:
+                result.append(self.canonicalize(arg, types_seen))
             return tuple(result)
         else:
             if type_var not in types_seen:
@@ -221,7 +235,7 @@ class TypeInferrer(object):
             assert isinstance(result, int)
         elif isinstance(expr, LambdaAbstraction):
             # Generate a new monotype to represent the bound variable.
-            type_var = self.new_type_var(Monotype())
+            type_var = self.new_type_var(MonotypeVar())
 
             # Generate a new polytype to store in the environment.
             polytype = Polytype(frozenset(), type_var)
@@ -246,7 +260,7 @@ class TypeInferrer(object):
 
             # Create a new type variable to represent the result of
             # the function application.
-            result = self.new_type_var(Monotype())
+            result = self.new_type_var(MonotypeVar())
 
             # Figure out what the type of "f" must be given the type
             # of "x" and the result type.
@@ -271,17 +285,17 @@ class TypeInferrer(object):
             assert False # Unrecognized lambda expression.
         return result
 
-    def occurs_in(self, type_set, application):
+    def occurs_in(self, type_set, monotype_app):
         # Determine whether a type variable in the set "type_set"
-        # appears anywhere in "application".  This is used to avoid
+        # appears anywhere in "monotype_app".  This is used to avoid
         # creating infinite types.
-        for i in xrange(1, len(application)):
-            set_i = self.__type_sets.find(application[i])
-            if set_i == type_set:
+        for arg in monotype_app.args:
+            arg_set = self.__type_sets.find(arg)
+            if arg_set == type_set:
                 return True
-            monotype_i = self.__inferred_types[set_i]
-            if monotype_i.application is not None and \
-                    self.occurs_in(type_set, monotype_i.application):
+            arg_monotype = self.__inferred_types[arg_set]
+            if isinstance(arg_monotype, MonotypeApp) and \
+                    self.occurs_in(type_set, arg_monotype):
                 return True
         return False
 
@@ -291,35 +305,35 @@ class TypeInferrer(object):
         set_y = self.__type_sets.find(type_y)
         monotype_x = self.__inferred_types[set_x]
         monotype_y = self.__inferred_types[set_y]
-        if monotype_x.application is None or monotype_y.application is None:
+        if isinstance(monotype_x, MonotypeVar) or \
+                isinstance(monotype_y, MonotypeVar):
             # Make sure we don't create infinite types.
-            if monotype_x.application is not None and \
-                    self.occurs_in(set_y, monotype_x.application):
+            if isinstance(monotype_x, MonotypeApp) and \
+                    self.occurs_in(set_y, monotype_x):
                 raise TypeInferenceError(
                     "Unifying {0!r} would create infinite type".format(
-                        monotype_x.application))
-            if monotype_y.application is not None and \
-                    self.occurs_in(set_x, monotype_y.application):
+                        monotype_x))
+            if isinstance(monotype_y, MonotypeApp) and \
+                    self.occurs_in(set_x, monotype_y):
                 raise TypeInferenceError(
                     "Unifying {0!r} would create infinite type".format(
-                        monotype_y.application))
+                        monotype_y))
             del self.__inferred_types[set_x]
             del self.__inferred_types[set_y]
             new_set = self.__type_sets.union(set_x, set_y)
-            if monotype_x.application is not None:
+            if isinstance(monotype_x, MonotypeApp):
                 self.__inferred_types[new_set] = monotype_x
             else:
                 # Covers the case where both x and y are free variables
                 self.__inferred_types[new_set] = monotype_y
         else:
             # Neither x nor y is a free variable.
-            if monotype_x.application[0] != monotype_y.application[0]:
+            if monotype_x.constructor != monotype_y.constructor:
                 raise TypeInferenceError("Can't unify {0!r} with {1!r}".format(
-                        monotype_x.application[0], monotype_y.application[0]))
-            assert len(monotype_x.application) == len(monotype_y.application)
-            for i in xrange(1, len(monotype_x.application)):
-                self.unify(monotype_x.application[i],
-                           monotype_y.application[i])
+                        monotype_x, monotype_y))
+            assert len(monotype_x.args) == len(monotype_y.args)
+            for i in xrange(0, len(monotype_x.args)):
+                self.unify(monotype_x.args[i], monotype_y.args[i])
 
     def check_invariants(self):
         all_sets = set(self.__type_sets.get_all_sets())
