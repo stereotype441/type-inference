@@ -542,8 +542,24 @@ class TestTypeInference(unittest.TestCase):
                     Application(Variable('id'), BoolLiteral(True)))),
             ('Bool',))
 
-    # TODO: test that variables bound with lambda can't be used in a
-    # general fashion.
+    def test_lambda_non_generalization(self):
+        # In contrast to variables bound by "let" expressions,
+        # variables bound by lambda abstractions are not general.  For
+        # example, this should fail to type check:
+        #
+        # (\f . (f (\x . x)) (f True))
+        #
+        # Because the first usage of f must have type "(a -> a) -> b",
+        # whereas the second usage must have type "Bool -> c", and
+        # these can't be unified.
+        self.check_type_error(
+            LambdaAbstraction(
+                'f',
+                Application(
+                    Application(
+                        Variable('f'),
+                        LambdaAbstraction('x', Variable('x'))),
+                    Application(Variable('f'), BoolLiteral(True)))))
 
 
 if __name__ == '__main__':
