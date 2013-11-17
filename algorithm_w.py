@@ -237,7 +237,6 @@ class TypeInferrer(object):
                                 specialize_part(monotype.application[i]))
                         new_application = tuple(new_application)
                         if (new_application == monotype.application):
-                            assert False
                             # No changes were made, so re-use the old type.
                             return type_variable
                         else:
@@ -620,6 +619,32 @@ class TestTypeInference(unittest.TestCase):
                                 LambdaAbstraction('z', Variable('z'))),
                             BoolLiteral(True))))),
             ('->', ('->', ('Bool',), 0), ('->', ('Bool',), 0)))
+
+    def test_partial_specialization(self):
+        # When a type specialization does not affect the entire type,
+        # we try to short-cut it to avoid creating extraneous type
+        # variables.  For example, in:
+        #
+        # (\f . let g = (\x . \y . f y) in g True)
+        #
+        # type-checking of (\x . \y . f y) causes f's type to be
+        # refined to "a -> b", and "g" is assigned a type of "forall c
+        # . c -> a -> b".  When "g" is applied to "True", the "a -> b"
+        # portion of the type doesn't need to be specialized.  The
+        # final type of the whole expression should be "(a -> b) -> (a
+        # -> b)".
+        self.check_single_expr(
+            LambdaAbstraction(
+                'f',
+                LetExpression(
+                    'g',
+                    LambdaAbstraction(
+                        'x',
+                        LambdaAbstraction(
+                            'y',
+                            Application(Variable('f'), Variable('y')))),
+                    Application(Variable('g'), BoolLiteral(True)))),
+            ('->', ('->', 0, 1), ('->', 0, 1)))
 
 
 if __name__ == '__main__':
