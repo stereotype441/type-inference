@@ -248,17 +248,29 @@ class TypeInferrer(object):
                 types_seen[type_var] = len(types_seen)
             return types_seen[type_var]
 
+    def visit_with_binding(self, var, binding, expr):
+        # If the new declaration shadows a previous declaration with
+        # the same variable name, save the type of the old variable.
+        old_binding = self.__env.get(var)
+
+        self.__env[var] = binding
+        result = self.visit(expr)
+
+        # Restore the old meaning of the bound variable.
+        if old_binding is None:
+            del self.__env[var]
+        else:
+            assert False
+            self.__env[var] = old_binding
+
+        return result
+
     def visit(self, expr):
         if isinstance(expr, Variable):
             # Look up the type bound to the variable name; if it was
             # introduced by a let expression we need to specialize it.
             result = self.specialize(self.__env[expr.name])
         elif isinstance(expr, LambdaAbstraction):
-            # If the new declaration shadows a previous declaration
-            # with the same variable name, save the type of the old
-            # variable.
-            old_var_type = self.__env.get(expr.var)
-
             # Generate a new monotype to represent the bound variable.
             type_var = self.new_type_var()
             monotype = Monotype()
@@ -266,18 +278,12 @@ class TypeInferrer(object):
 
             # Generate a new polytype to store in the environment.
             # TODO: should polytype.bound_vars be a list or a tuple?
-            self.__env[expr.var] = Polytype([], type_var)
+            polytype = Polytype([], type_var)
 
             # Visit the subexpression and allow it to refine the type
             # of the bound variable.
-            subexpr_type = self.visit(expr.expr)
-
-            # Restore the old meaning of the bound variable.
-            if old_var_type is None:
-                del self.__env[expr.var]
-            else:
-                assert False
-                self.__env[expr.var] = old_var_type
+            subexpr_type = self.visit_with_binding(expr.var, polytype,
+                                                   expr.expr)
 
             # The inferred type of the resulting abstraction is
             # (var_type -> subexpr_type).
