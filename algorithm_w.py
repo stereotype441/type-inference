@@ -689,6 +689,27 @@ class TestTypeInference(unittest.TestCase):
                     LambdaAbstraction('y', Variable('x')))),
             ('->', 0, 0))
 
+    def test_let_shadowing(self):
+        # When a let expression redefines a variable bound in an outer
+        # expression, the outer definition needs to be restored once
+        # the let expression is exited.  For example, in:
+        #
+        # (\x . (let x = \y . y in x) x)
+        #
+        # The "x" appearing inside "let x = \y . y in x" has type
+        # "forall b . b -> b", whereas the "x" appearing at the end
+        # has type "a", giving the entire expression type "a -> a".
+        self.check_single_expr(
+            LambdaAbstraction(
+                'x',
+                Application(
+                    LetExpression(
+                        'x',
+                        LambdaAbstraction('y', Variable('y')),
+                        Variable('x')),
+                    Variable('x'))),
+            ('->', 0, 0))
+
 
 if __name__ == '__main__':
     unittest.main()
