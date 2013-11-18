@@ -11,7 +11,7 @@ Tested with Python 2.7.
 Usage:
 -----
 
-To type check a lambda expression, invoke "pyton main.py
+To type check a lambda expression, invoke "python main.py
 <expression>".  For example:
 
     $ python main.py '\x . \y . x'
