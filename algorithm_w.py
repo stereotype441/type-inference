@@ -705,9 +705,8 @@ class TestTypeInference(unittest.TestCase):
         #
         # let unify = \x . \y . second (\z . ignore2 (z x) (z y)) x
         #
-        # "unify" has type "a -> a -> Bool"; it
-        # forces its two arguments to have the same type, and returns
-        # the first argument.
+        # "unify" has type "a -> a -> a"; it forces its two arguments
+        # to have the same type, and returns the first argument.
         #
         # let mk_fn = \x . \y . \z . second (unify x z) y
         #
