@@ -821,6 +821,12 @@ class TestTypeInference(unittest.TestCase):
         self.check_single_expr(
             parse('mk_pair'),
             ('->', 0, ('->', 1, ('Pair', 0, 1))))
+        self.check_single_expr(
+            parse('fst'),
+            ('->', ('Pair', 0, 1), 0))
+        self.check_single_expr(
+            parse('snd'),
+            ('->', ('Pair', 0, 1), 1))
 
     def test_curry(self):
         # Check the type of the curry function
